@@ -4,8 +4,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ChatRoom from './pages/ChatRoom';
+import CallRoom from './pages/CallRoom';
 import ChatHistory from './pages/ChatHistory';
 import CallHistory from './pages/CallHistory';
 import Profile from './pages/Profile';
@@ -38,8 +40,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/chat-room/:chatId" element={<ProtectedRoute><ChatRoom /></ProtectedRoute>} />
+      <Route path="/call-room/:callId" element={<ProtectedRoute><CallRoom /></ProtectedRoute>} />
       <Route path="/chat-history" element={<ProtectedRoute><ChatHistory /></ProtectedRoute>} />
       <Route path="/call-history" element={<ProtectedRoute><CallHistory /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

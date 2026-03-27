@@ -11,7 +11,7 @@ const CallHistory = () => {
 
   const fetchHistory = async () => {
     try {
-      const res = await callApi.getCallHistory({ userId: astrologer?.userId, startIndex: 0, fetchRecord: 50 });
+      const res = await callApi.getCallHistory({ astrologerId: astrologer?.id, startIndex: 0, fetchRecord: 50 });
       setHistory(res.data?.recordList || []);
     } catch (err) { console.error(err); }
     setLoading(false);

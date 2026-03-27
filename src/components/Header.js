@@ -37,6 +37,7 @@ const Header = () => {
             <Link to="/kundali" onClick={closeMenu}>Kundali</Link>
             <Link to="/kundali-matching" onClick={closeMenu}>Kundali Matching</Link>
             <Link to="/horoscope" onClick={closeMenu}>Horoscope</Link>
+            <Link to="/panchang" onClick={closeMenu}>Panchang</Link>
             <Link to="/blog" onClick={closeMenu}>Blog</Link>
           </div>
         </div>

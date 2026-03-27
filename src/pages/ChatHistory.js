@@ -9,12 +9,13 @@ const ChatHistory = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!astrologer?.id) return;
     fetchHistory();
-  }, []);
+  }, [astrologer]);
 
   const fetchHistory = async () => {
     try {
-      const res = await chatApi.getChatHistory({ astrologerId: astrologer?.id, startIndex: 0, fetchRecord: 50 });
+      const res = await chatApi.getChatHistory({ astrologerId: astrologer.id, startIndex: 0, fetchRecord: 50 });
       const d = res.data;
       setHistory(d?.recordList || []);
     } catch (err) {

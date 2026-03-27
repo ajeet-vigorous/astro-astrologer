@@ -5,6 +5,7 @@ export const authApi = {
   sendOtp: (data) => API.post('/astro/checkContactNoExistForUser', data),
   login: (data) => API.post('/astro/loginAppAstrologer', data),
   register: (data) => API.post('/astro/astrologer/add', data),
+  getMasterData: () => API.post('/astro/getMasterAstrologer'),
 };
 
 // Astrologer Profile
@@ -35,8 +36,11 @@ export const callApi = {
   getRequests: (data) => API.post('/customer/callRequest/get', data),
   acceptRequest: (data) => API.post('/customer/callRequest/accept', data),
   rejectRequest: (data) => API.post('/customer/callRequest/reject', data),
+  endCall: (data) => API.post('/customer/callRequest/end', data),
   updateStatus: (data) => API.post('/customer/addCallStatus', data),
   getCallHistory: (data) => API.post('/customer/getCallHistory', data),
+  getCallById: (data) => API.post('/customer/getCallById', data),
+  getZegoToken: (data) => API.post('/customer/zegocloud/token', data),
 };
 
 // Wallet & Withdraw
@@ -72,6 +76,7 @@ export const blogApi = {
 export const horoscopeApi = {
   getSigns: () => API.post('/customer/getHororscopeSign'),
   getDaily: (data) => API.post('/customer/getDailyHoroscope', data),
+  getEnabledLanguages: () => API.post('/customer/getEnabledLanguages'),
 };
 
 // Kundali

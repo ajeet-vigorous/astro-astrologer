@@ -99,6 +99,9 @@ const Login = () => {
             </p>
           </>
         )}
+        <p style={{ textAlign: 'center', marginTop: 18, color: '#6b7280', fontSize: '0.9rem' }}>
+          Not registered? <span style={{ color: '#7c3aed', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/register')}>Register here</span>
+        </p>
       </div>
     </div>
   );

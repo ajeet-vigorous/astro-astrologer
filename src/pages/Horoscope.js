@@ -20,6 +20,8 @@ const Horoscope = () => {
   const [tab, setTab] = useState('daily');
   const [loading, setLoading] = useState(false);
   const [signsLoading, setSignsLoading] = useState(true);
+  const [lang, setLang] = useState('en');
+  const [languages, setLanguages] = useState([]);
 
   useEffect(() => {
     const fetchSigns = async () => {
@@ -32,14 +34,18 @@ const Horoscope = () => {
       setSignsLoading(false);
     };
     fetchSigns();
+    horoscopeApi.getEnabledLanguages().then(res => {
+      const list = res.data?.recordList || [];
+      setLanguages(list.length ? list : [{ code: 'en', name: 'English' }]);
+    }).catch(() => setLanguages([{ code: 'en', name: 'English' }]));
   }, []);
 
-  const fetchHoroscope = async (sign) => {
+  const fetchHoroscope = async (sign, langCode) => {
     setSelectedSign(sign);
     setLoading(true);
     setTab('daily');
     try {
-      const res = await horoscopeApi.getDaily({ horoscopeSignId: sign.id, langcode: 'en' });
+      const res = await horoscopeApi.getDaily({ horoscopeSignId: sign.id, langcode: langCode || lang });
       const d = res.data?.data || res.data;
       setVedicList(d?.vedicList || null);
     } catch (err) { console.error(err); }
@@ -94,6 +100,10 @@ const Horoscope = () => {
           <h3>{zodiacIcons[selectedSign.name]} {selectedSign.name}</h3>
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+            <select value={lang} onChange={(e) => { setLang(e.target.value); if (selectedSign) fetchHoroscope(selectedSign, e.target.value); }}
+              style={{ padding: '8px 14px', border: '2px solid #e0d4f5', borderRadius: 8, fontSize: '0.9rem', fontWeight: 600, color: '#1a0533', outline: 'none', marginBottom: 12 }}>
+              {languages.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+            </select>
             {['daily', 'weekly', 'yearly'].map(t => (
               <button key={t} onClick={() => setTab(t)}
                 style={{

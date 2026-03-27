@@ -50,6 +50,8 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
 .reject-btn { background: #ef4444; color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
 .reject-btn:hover { background: #dc2626; }
 .no-requests { text-align: center; color: #9ca3af; padding: 40px; background: #fff; border-radius: 14px; }
+.call-request-card { border-left: 4px solid #f59e0b; }
+.call-type-badge { display: inline-block; font-size: 0.7rem; background: #f59e0b; color: #fff; padding: 2px 8px; border-radius: 10px; margin-left: 6px; font-weight: 600; vertical-align: middle; }
 
 /* Chat Room */
 .chatroom { display: flex; flex-direction: column; height: 100vh; background: #f5f0ff; }
