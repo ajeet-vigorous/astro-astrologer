@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://astrology-i7c9.onrender.com';
+const SOCKET_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 const Dashboard = () => {
   const { astrologer, logout } = useAuth();
@@ -242,7 +242,7 @@ const Dashboard = () => {
             {chatRequests.map((req) => (
               <div key={req.id} className="request-card">
                 <img
-                  src={req.userProfile ? (req.userProfile.startsWith('http') ? req.userProfile : `https://astrology-i7c9.onrender.com/${req.userProfile}`) : '/default-avatar.png'}
+                  src={req.userProfile ? (req.userProfile.startsWith('http') ? req.userProfile : `http://localhost:5000/${req.userProfile}`) : '/default-avatar.png'}
                   alt={req.userName || 'User'}
                   onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23e0d4f5"/><text x="50" y="55" text-anchor="middle" font-size="40" fill="%237c3aed">U</text></svg>'; }}
                 />
@@ -278,7 +278,7 @@ const Dashboard = () => {
             {callRequests.map((req) => (
               <div key={req.id} className="request-card call-request-card">
                 <img
-                  src={req.userProfile ? (req.userProfile.startsWith('http') ? req.userProfile : `https://astrology-i7c9.onrender.com/${req.userProfile}`) : '/default-avatar.png'}
+                  src={req.userProfile ? (req.userProfile.startsWith('http') ? req.userProfile : `http://localhost:5000/${req.userProfile}`) : '/default-avatar.png'}
                   alt={req.userName || 'User'}
                   onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23e0d4f5"/><text x="50" y="55" text-anchor="middle" font-size="40" fill="%237c3aed">U</text></svg>'; }}
                 />

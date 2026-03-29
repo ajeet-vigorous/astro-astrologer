@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { chatApi } from '../api/services';
 
 const Header = () => {
   const { astrologer, logout } = useAuth();
@@ -13,12 +14,38 @@ const Header = () => {
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const [activeSession, setActiveSession] = useState(null);
+
+  useEffect(() => {
+    if (!astrologer) { setActiveSession(null); return; }
+    const checkActive = async () => {
+      try {
+        const res = await chatApi.getActiveSession({ astrologerId: astrologer?.id });
+        const d = res.data;
+        if (d?.activeChat) setActiveSession({ type: 'chat', id: d.activeChat.id, name: d.activeChat.userName, status: d.activeChat.chatStatus });
+        else if (d?.activeCall) setActiveSession({ type: 'call', id: d.activeCall.id, name: d.activeCall.userName, status: d.activeCall.callStatus });
+        else setActiveSession(null);
+      } catch(e) { setActiveSession(null); }
+    };
+    checkActive();
+    const interval = setInterval(checkActive, 15000);
+    return () => clearInterval(interval);
+  }, [astrologer]);
 
   const imgSrc = astrologer?.profileImage
-    ? (astrologer.profileImage.startsWith('http') ? astrologer.profileImage : `https://astrology-i7c9.onrender.com${astrologer.profileImage}`)
+    ? (astrologer.profileImage.startsWith('http') ? astrologer.profileImage : `http://localhost:5000${astrologer.profileImage}`)
     : null;
 
   return (
+    <>
+    {activeSession && (
+      <div onClick={() => navigate(activeSession.type === 'chat' ? `/chat-room/${activeSession.id}` : `/call-room/${activeSession.id}`)}
+        style={{ background: '#10b981', color: '#fff', textAlign: 'center', padding: '10px 16px', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff', display: 'inline-block', animation: 'dotBlink 1s infinite' }}></span>
+        <span>Active {activeSession.type === 'chat' ? 'Chat' : 'Call'} with <strong>{activeSession.name}</strong> ({activeSession.status})</span>
+        <span style={{ background: 'rgba(255,255,255,0.25)', padding: '4px 12px', borderRadius: 20, fontWeight: 600, fontSize: '0.8rem' }}>Resume &rarr;</span>
+      </div>
+    )}
     <header className="astro-header">
       <Link to="/" className="header-logo">AstroGuru</Link>
 
@@ -70,6 +97,7 @@ const Header = () => {
         </div>
       </nav>
     </header>
+    </>
   );
 };
 
