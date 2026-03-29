@@ -15,7 +15,7 @@ const Header = () => {
   const closeMenu = () => setMenuOpen(false);
 
   const imgSrc = astrologer?.profileImage
-    ? (astrologer.profileImage.startsWith('http') ? astrologer.profileImage : `http://localhost:5000${astrologer.profileImage}`)
+    ? (astrologer.profileImage.startsWith('http') ? astrologer.profileImage : `https://astrology-i7c9.onrender.com${astrologer.profileImage}`)
     : null;
 
   return (
