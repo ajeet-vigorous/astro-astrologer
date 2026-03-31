@@ -164,7 +164,7 @@ const Wallet = () => {
             <tbody>
               {withdrawals.map((w, i) => (
                 <tr key={i}>
-                  <td>&#8377;{parseFloat(w.amount || 0).toFixed(2)}</td>
+                  <td>&#8377;{parseFloat(w.withdrawAmount || w.amount || 0).toFixed(2)}</td>
                   <td>{w.paymentMethod || '-'}</td>
                   <td><span className={`badge ${(w.status || '').toLowerCase()}`}>{w.status || 'Pending'}</span></td>
                   <td>{w.created_at ? new Date(w.created_at).toLocaleDateString('en-IN') : '-'}</td>
