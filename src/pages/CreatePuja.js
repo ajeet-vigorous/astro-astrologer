@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { pujaApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import API from '../api/axios';
 
 const CreatePuja = () => {
   const { astrologer } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    pujaName: '', pujaPrice: '', pujaDescription: '',
+    pujaName: '', pujaPrice: '', pujaDescription: '', categoryId: '',
   });
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    API.post('/customer/getPujaCategory').then(res => {
+      setCategories(res.data?.recordList || []);
+    }).catch(() => {});
+  }, []);
   const [pujaImage, setPujaImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,14 +30,16 @@ const CreatePuja = () => {
     }
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('astrologerId', astrologer?.id);
-      formData.append('pujaName', form.pujaName);
-      formData.append('pujaPrice', form.pujaPrice);
-      formData.append('pujaDescription', form.pujaDescription);
-      if (pujaImage) formData.append('pujaImage', pujaImage);
-
-      await pujaApi.add(formData);
+      await pujaApi.add({
+        astrologerId: astrologer?.id,
+        puja_title: form.pujaName,
+        puja_price: form.pujaPrice,
+        long_description: form.pujaDescription,
+        puja_place: 'Online',
+        puja_start_datetime: new Date(Date.now() + 86400000).toISOString(),
+        puja_duration: 60,
+        category_id: form.categoryId,
+      });
       toast.success('Puja created successfully');
       navigate('/my-pujas');
     } catch (err) {
@@ -54,6 +64,13 @@ const CreatePuja = () => {
           <div className="form-field">
             <label>Price (&#8377;) *</label>
             <input name="pujaPrice" type="number" value={form.pujaPrice} onChange={handleChange} required placeholder="Enter price" />
+          </div>
+          <div className="form-field">
+            <label>Category *</label>
+            <select name="categoryId" value={form.categoryId} onChange={handleChange} required>
+              <option value="">Select Category</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
         </div>
 

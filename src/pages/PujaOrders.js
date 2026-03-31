@@ -13,22 +13,21 @@ const PujaOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const res = await pujaApi.getList({ astrologerId: astrologer?.id, type: 'orders', startIndex: 0, fetchRecord: 50 });
+      const res = await pujaApi.getOrders({ astrologerId: astrologer?.id });
       const d = res.data;
       setOrders(d?.recordList || d?.data || []);
     } catch (err) { console.error(err); }
     setLoading(false);
   };
 
-  const handleSendToUser = async (order) => {
-    setSendingTo(order.id);
+  const handleComplete = async (orderId) => {
+    if (!window.confirm('Mark this puja as completed?')) return;
+    setSendingTo(orderId);
     try {
-      await pujaApi.sendToUser({ orderId: order.id, userId: order.userId, astrologerId: astrologer?.id });
-      toast.success('Puja sent to user');
-      fetchOrders();
-    } catch (err) {
-      toast.error('Failed to send puja');
-    }
+      const res = await pujaApi.completeOrder({ orderId, astrologerId: astrologer?.id });
+      if (res.data?.status === 200) { toast.success('Puja completed!'); fetchOrders(); }
+      else toast.error(res.data?.message || 'Failed');
+    } catch (err) { toast.error('Failed'); }
     setSendingTo(null);
   };
 
@@ -46,25 +45,28 @@ const PujaOrders = () => {
       ) : (
         <table className="data-table">
           <thead>
-            <tr><th>User</th><th>Puja</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr>
+            <tr><th>User</th><th>Contact</th><th>Puja</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr>
           </thead>
           <tbody>
             {orders.map((o, i) => (
               <tr key={i}>
                 <td>{o.userName || 'User'}</td>
-                <td>{o.pujaName || o.name || '-'}</td>
-                <td>&#8377;{parseFloat(o.amount || o.pujaPrice || 0).toFixed(2)}</td>
+                <td>{o.contactNo || '-'}</td>
+                <td>{o.pujaTitle || o.puja_name || '-'}</td>
+                <td>&#8377;{parseFloat(o.order_total_price || 0).toFixed(2)}</td>
                 <td>{o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN') : '-'}</td>
-                <td><span className={`badge ${(o.status || 'pending').toLowerCase()}`}>{o.status || 'Pending'}</span></td>
+                <td><span className={`badge ${(o.puja_order_status || 'placed').toLowerCase()}`}>{o.puja_order_status || 'Placed'}</span></td>
                 <td>
-                  {o.status !== 'completed' && (
+                  {o.puja_order_status !== 'completed' ? (
                     <button
                       className="btn-sm btn-primary"
-                      onClick={() => handleSendToUser(o)}
+                      onClick={() => handleComplete(o.id)}
                       disabled={sendingTo === o.id}
                     >
-                      {sendingTo === o.id ? 'Sending...' : 'Send to User'}
+                      {sendingTo === o.id ? '...' : 'Mark Complete'}
                     </button>
+                  ) : (
+                    <span style={{ color: '#059669', fontWeight: 600, fontSize: '0.85rem' }}>Done</span>
                   )}
                 </td>
               </tr>

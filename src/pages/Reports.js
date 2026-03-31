@@ -11,7 +11,7 @@ const Reports = () => {
 
   const fetchReports = async () => {
     try {
-      const res = await reportApi.getReports({ userId: astrologer?.userId, startIndex: 0, fetchRecord: 50 });
+      const res = await reportApi.getReports({ astrologerId: astrologer?.id, startIndex: 0, fetchRecord: 50 });
       const d = res.data;
       setReports(d?.recordList || d?.data || []);
     } catch (err) { console.error(err); }
@@ -32,17 +32,17 @@ const Reports = () => {
       ) : (
         <table className="data-table">
           <thead>
-            <tr><th>User</th><th>Type</th><th>Duration</th><th>Earnings</th><th>Date</th><th>Status</th></tr>
+            <tr><th>User</th><th>Report Type</th><th>Rate</th><th>Birth Date</th><th>Date</th><th>Status</th></tr>
           </thead>
           <tbody>
             {reports.map((r, i) => (
               <tr key={i}>
-                <td>{r.userName || r.name || 'User'}</td>
-                <td>{r.requestType || r.type || '-'}</td>
-                <td>{r.totalMin || r.duration || 0} min</td>
-                <td className="text-green">&#8377;{parseFloat(r.deduction || r.amount || 0).toFixed(2)}</td>
+                <td>{r.firstName || r.userName || 'User'} {r.lastName || ''}</td>
+                <td>{r.reportType || '-'}</td>
+                <td className="text-green">&#8377;{parseFloat(r.reportRate || 0).toFixed(2)}</td>
+                <td>{r.birthDate || '-'}</td>
                 <td>{r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '-'}</td>
-                <td><span className={`badge ${(r.status || 'completed').toLowerCase()}`}>{r.status || 'Completed'}</span></td>
+                <td><span className={`badge ${r.reportFile ? 'completed' : 'pending'}`}>{r.reportFile ? 'Completed' : 'Pending'}</span></td>
               </tr>
             ))}
           </tbody>

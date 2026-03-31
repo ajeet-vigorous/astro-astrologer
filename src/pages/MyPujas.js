@@ -46,11 +46,12 @@ const MyPujas = () => {
         <div className="puja-grid">
           {pujas.map((p, i) => (
             <div className="puja-card" key={i}>
-              {p.pujaImage && <img src={p.pujaImage} alt={p.pujaName} className="puja-image" />}
+              {p.puja_images && (() => { try { const imgs = typeof p.puja_images === 'string' ? JSON.parse(p.puja_images) : p.puja_images; return imgs[0] ? <img src={imgs[0].startsWith('http') ? imgs[0] : `http://localhost:5000/${imgs[0]}`} alt={p.puja_title} className="puja-image" /> : null; } catch(e) { return null; } })()}
               <div className="puja-info">
-                <h4>{p.pujaName || p.name || 'Puja'}</h4>
-                <p className="puja-price">&#8377;{parseFloat(p.pujaPrice || p.price || 0).toFixed(2)}</p>
-                <p className="puja-desc">{p.pujaDescription || p.description || ''}</p>
+                <h4>{p.puja_title || p.pujaName || 'Puja'}</h4>
+                <p className="puja-price">&#8377;{parseFloat(p.puja_price || 0).toFixed(2)}</p>
+                <p className="puja-desc">{(p.long_description || '').slice(0, 100)}</p>
+                <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{p.puja_place || ''} | {p.isAdminApproved === 'Approved' ? '✅ Approved' : '⏳ Pending Approval'}</p>
                 <div className="puja-actions">
                   <button className="btn-sm btn-danger" onClick={() => handleDelete(p.id)}>Delete</button>
                 </div>

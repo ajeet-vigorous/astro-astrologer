@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { chatApi } from '../api/services';
+import { chatApi, pujaApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
@@ -22,6 +22,9 @@ const ChatRoom = () => {
   const socketRef = useRef(null);
   const timerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const [showPujaModal, setShowPujaModal] = useState(false);
+  const [myPujas, setMyPujas] = useState([]);
+  const [recommendingId, setRecommendingId] = useState(null);
 
   useEffect(() => {
     initChat();
@@ -187,8 +190,55 @@ const ChatRoom = () => {
             {formatTime(timeElapsed)}
           </span>
           <button className="end-btn" onClick={handleEndChat}>End Chat</button>
+          <button onClick={async () => {
+            try { const res = await pujaApi.getList({ astrologerId: astrologer?.id }); setMyPujas(res.data?.recordList || []); } catch(e) {}
+            setShowPujaModal(true);
+          }} style={{ background: '#f59e0b', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem' }}>Recommend Puja</button>
         </div>
       </div>
+
+      {/* Recommend Puja Modal */}
+      {showPujaModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowPujaModal(false)}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 24, maxWidth: 400, width: '90%' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px' }}>Recommend Puja to Customer</h3>
+            {myPujas.length === 0 ? (
+              <p style={{ color: '#9ca3af', textAlign: 'center', padding: 20 }}>No pujas available. Create one first.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 300, overflowY: 'auto' }}>
+                {myPujas.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', border: '1px solid #e0d4f5', borderRadius: 10 }}>
+                    <div>
+                      <strong style={{ fontSize: '0.9rem' }}>{p.puja_title}</strong>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#7c3aed' }}>&#8377;{p.puja_price}</p>
+                    </div>
+                    <button disabled={recommendingId === p.id} onClick={async () => {
+                      setRecommendingId(p.id);
+                      try {
+                        await pujaApi.sendToUser({ astrologerId: astrologer?.id, userId: chatDetail?.userId, puja_id: p.id });
+                        toast.success('Puja recommended!');
+                        setShowPujaModal(false);
+                        // Add puja card to chat messages
+                        setMessages(prev => [...prev, {
+                          id: 'puja_sent_' + Date.now(),
+                          senderType: 'system',
+                          message: `__PUJA_SENT__`,
+                          pujaData: { pujaTitle: p.puja_title, pujaPrice: p.puja_price, status: 'Sent' },
+                          created_at: new Date().toISOString()
+                        }]);
+                      } catch(e) { toast.error(e.response?.data?.message || 'Failed'); }
+                      setRecommendingId(null);
+                    }} style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>
+                      {recommendingId === p.id ? '...' : 'Send'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowPujaModal(false)} style={{ marginTop: 16, width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontWeight: 500 }}>Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="messages-area">
         {messages.length === 0 ? (
@@ -197,13 +247,22 @@ const ChatRoom = () => {
           </div>
         ) : (
           messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`msg-bubble ${msg.senderType === 'astrologer' ? 'sent' : 'received'}`}
-            >
-              <p className="msg-text">{msg.message}</p>
-              <span className="msg-time">{formatMsgTime(msg.created_at)}</span>
-            </div>
+            msg.message === '__PUJA_SENT__' && msg.pujaData ? (
+              <div key={msg.id} style={{ margin: '12px auto', maxWidth: '85%', background: '#f0fdf4', border: '2px solid #10b981', borderRadius: 14, padding: 16, textAlign: 'center' }}>
+                <span style={{ background: '#10b981', color: '#fff', padding: '2px 10px', borderRadius: 10, fontSize: '0.75rem', fontWeight: 600 }}>Puja Sent</span>
+                <h4 style={{ margin: '8px 0 4px', color: '#1a0533' }}>{msg.pujaData.pujaTitle}</h4>
+                <p style={{ margin: 0, color: '#7c3aed', fontWeight: 700 }}>&#8377;{msg.pujaData.pujaPrice || 0}</p>
+                <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.8rem' }}>Waiting for customer response...</p>
+              </div>
+            ) : (
+              <div
+                key={msg.id}
+                className={`msg-bubble ${msg.senderType === 'astrologer' ? 'sent' : 'received'}`}
+              >
+                <p className="msg-text">{msg.message}</p>
+                <span className="msg-time">{formatMsgTime(msg.created_at)}</span>
+              </div>
+            )
           ))
         )}
         {typing && <div className="typing-indicator">User is typing...</div>}

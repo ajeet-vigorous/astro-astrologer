@@ -65,6 +65,8 @@ export const pujaApi = {
   add: (data) => API.post('/astro/addAstrologerPuja', data),
   delete: (data) => API.post('/astro/deleteAstrologerPuja', data),
   sendToUser: (data) => API.post('/astro/sendPujatoUser', data),
+  getOrders: (data) => API.post('/astro/getAstrologerPujaOrders', data),
+  completeOrder: (data) => API.post('/astro/completePujaOrder', data),
 };
 
 // Blog
@@ -98,7 +100,9 @@ export const reviewApi = {
 
 // Reports
 export const reportApi = {
-  getReports: (data) => API.post('/customer/getCallHistory', data),
+  getReports: (data) => API.post('/customer/getUserReport', data),
+  updateReport: (id, data) => API.post(`/customer/userReport/update/${id}`, data),
+  uploadFile: (data) => API.post('/customer/userreport/add', data),
 };
 
 // Live
