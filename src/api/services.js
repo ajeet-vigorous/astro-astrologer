@@ -102,7 +102,7 @@ export const reviewApi = {
 export const reportApi = {
   getReports: (data) => API.post('/customer/getUserReport', data),
   updateReport: (id, data) => API.post(`/customer/userReport/update/${id}`, data),
-  uploadFile: (data) => API.post('/customer/userreport/add', data),
+  uploadFile: (data) => API.post('/customer/userReport/uploadFile', data),
 };
 
 // Live
