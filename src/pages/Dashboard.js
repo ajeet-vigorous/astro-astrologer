@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { chatApi, callApi } from '../api/services';
+import { chatApi, callApi, boostApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
@@ -15,12 +15,15 @@ const Dashboard = () => {
   const [chatStatus, setChatStatus] = useState(astrologer?.chatStatus || 'Offline');
   const [callStatus, setCallStatus] = useState(astrologer?.callStatus || 'Offline');
   const [loading, setLoading] = useState(true);
+  const [boostInfo, setBoostInfo] = useState(null);
+  const [boosting, setBoosting] = useState(false);
   const socketRef = useRef(null);
   const pollRef = useRef(null);
 
   useEffect(() => {
     fetchRequests();
     connectSocket();
+    boostApi.getInfo({ astrologer_id: astrologer?.id }).then(res => setBoostInfo(res.data)).catch(() => {});
 
     // Poll for new requests every 5 seconds
     pollRef.current = setInterval(fetchRequests, 5000);
@@ -224,6 +227,36 @@ const Dashboard = () => {
           <button className="logout-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>
+
+      {/* Profile Boost Card */}
+      {boostInfo && (
+        <div style={{ margin: '0 20px 20px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', borderRadius: 14, padding: 20, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: '0 0 4px' }}>Boost Your Profile</h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9 }}>
+              {boostInfo.isBoosted ? 'Your profile is boosted! Expires in 24 hours.' : 'Appear on top of astrologer list for 24 hours.'}
+              {boostInfo.remainingBoosts !== undefined && ` (${boostInfo.remainingBoosts} boosts remaining this month)`}
+            </p>
+          </div>
+          {!boostInfo.isBoosted && (
+            <button onClick={async () => {
+              if (!window.confirm('Boost your profile? Commission rates will change for 24 hours.')) return;
+              setBoosting(true);
+              try {
+                const res = await boostApi.boost({ astrologer_id: astrologer?.id });
+                if (res.data?.status === 200) { toast.success('Profile boosted!'); boostApi.getInfo({ astrologer_id: astrologer?.id }).then(r => setBoostInfo(r.data)); }
+                else toast.error(res.data?.message || 'Failed');
+              } catch(e) { toast.error(e.response?.data?.message || 'Failed'); }
+              setBoosting(false);
+            }} disabled={boosting} style={{ background: '#fff', color: '#d97706', border: 'none', padding: '12px 28px', borderRadius: 50, fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}>
+              {boosting ? 'Boosting...' : 'Boost Now'}
+            </button>
+          )}
+          {boostInfo.isBoosted && (
+            <span style={{ background: 'rgba(255,255,255,0.3)', padding: '8px 20px', borderRadius: 50, fontWeight: 600 }}>Active</span>
+          )}
+        </div>
+      )}
 
       <div className="dashboard-content">
         <h3>Chat Requests ({chatRequests.length})</h3>

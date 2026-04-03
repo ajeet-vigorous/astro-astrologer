@@ -92,6 +92,13 @@ export const kundaliApi = {
   getPanchang: (data) => API.post('/customer/get/panchang', data),
 };
 
+// Profile Boost
+export const boostApi = {
+  getInfo: (data) => API.post('/customer/getProfileboost', data),
+  boost: (data) => API.post('/customer/boostProfile', data),
+  history: (data) => API.post('/customer/Profileboosthistory', data),
+};
+
 // Reviews
 export const reviewApi = {
   getReviews: (data) => API.post('/astro/getUserReview', data),

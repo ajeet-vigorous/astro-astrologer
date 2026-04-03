@@ -4,7 +4,7 @@ import { authApi } from '../api/services';
 import { toast } from 'react-toastify';
 import './Register.css';
 
-const STEPS = ['Basic Info', 'Professional', 'Bank Details', 'About & Photo'];
+const STEPS = ['Basic Info', 'Professional', 'Bank Details', 'Documents', 'About & Photo'];
 
 const Register = () => {
   const navigate = useNavigate();
@@ -27,6 +27,10 @@ const Register = () => {
     accountNumber: '', accountHolderName: '', upi: '',
     pancardNo: '', aadharNo: '',
     profileImage: null,
+    aadhar_front: null,
+    pan_front: null,
+    certificate_image: null,
+    termsAccepted: false,
   });
 
   useEffect(() => {
@@ -78,6 +82,14 @@ const Register = () => {
     }
   };
 
+  const handleDocUpload = (e, field) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setForm({ ...form, [field]: reader.result.split(',')[1] });
+    reader.readAsDataURL(file);
+  };
+
   const nextStep = () => {
     if (step === 0 && (!form.name || !form.contactNo || !form.gender || !form.email)) {
       toast.error('Fill all required fields'); return;
@@ -86,6 +98,7 @@ const Register = () => {
     if (step === 1 && (!form.primarySkill || !form.charge || !form.experienceInYears)) {
       toast.error('Fill all required fields'); return;
     }
+    if (step === 4 && !form.termsAccepted) { toast.error('Please accept Terms & Conditions'); return; }
     setStep(step + 1);
   };
 
@@ -300,7 +313,31 @@ const Register = () => {
         )}
 
         {/* Step 3: About & Photo */}
+        {/* Step 3: Documents */}
         {step === 3 && (
+          <div className="step-content">
+            <div className="reg-row">
+              <div className="reg-field">
+                <label>Aadhar Card (Front) *</label>
+                <input type="file" accept="image/*" onChange={(e) => handleDocUpload(e, 'aadhar_front')} />
+                {form.aadhar_front && <img src={`data:image/png;base64,${form.aadhar_front}`} alt="Aadhar" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6, marginTop: 8, border: '1px solid #e0d4f5' }} />}
+              </div>
+              <div className="reg-field">
+                <label>PAN Card *</label>
+                <input type="file" accept="image/*" onChange={(e) => handleDocUpload(e, 'pan_front')} />
+                {form.pan_front && <img src={`data:image/png;base64,${form.pan_front}`} alt="PAN" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6, marginTop: 8, border: '1px solid #e0d4f5' }} />}
+              </div>
+            </div>
+            <div className="reg-field full">
+              <label>Certificate (Astrology degree/diploma)</label>
+              <input type="file" accept="image/*" onChange={(e) => handleDocUpload(e, 'certificate_image')} />
+              {form.certificate_image && <img src={`data:image/png;base64,${form.certificate_image}`} alt="Certificate" style={{ width: 150, height: 100, objectFit: 'cover', borderRadius: 6, marginTop: 8, border: '1px solid #e0d4f5' }} />}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: About & Photo + Terms */}
+        {step === 4 && (
           <div className="step-content">
             <div className="reg-field full">
               <label>About You / Bio</label>
@@ -311,6 +348,41 @@ const Register = () => {
               <input type="file" accept="image/*" onChange={handleImageChange} />
               {form.profileImage && <img src={`data:image/png;base64,${form.profileImage}`} alt="Preview" className="photo-preview" />}
             </div>
+            <div className="reg-field full" style={{ marginTop: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.termsAccepted} onChange={(e) => setForm({ ...form, termsAccepted: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#7c3aed' }} />
+                <span>I agree to the <a href="/terms-condition" target="_blank" style={{ color: '#7c3aed' }}>Terms & Conditions</a> and <a href="/privacy-policy" target="_blank" style={{ color: '#7c3aed' }}>Privacy Policy</a></span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Preview */}
+        {step === 5 && (
+          <div className="step-content">
+            <h3 style={{ margin: '0 0 16px', color: '#1a0533' }}>Review Your Details</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.9rem' }}>
+              <div><strong>Name:</strong> {form.name}</div>
+              <div><strong>Email:</strong> {form.email}</div>
+              <div><strong>Phone:</strong> {form.contactNo}</div>
+              <div><strong>WhatsApp:</strong> {form.whatsappNo || '-'}</div>
+              <div><strong>Gender:</strong> {form.gender}</div>
+              <div><strong>DOB:</strong> {form.birthDate || '-'}</div>
+              <div><strong>City:</strong> {form.currentCity || '-'}</div>
+              <div><strong>Experience:</strong> {form.experienceInYears || '-'} yrs</div>
+              <div><strong>Chat Rate:</strong> ₹{form.charge || 0}/min</div>
+              <div><strong>Video Rate:</strong> ₹{form.videoCallRate || 0}/min</div>
+              <div><strong>Bank:</strong> {form.bankName || '-'}</div>
+              <div><strong>Account:</strong> {form.accountNumber || '-'}</div>
+              <div><strong>IFSC:</strong> {form.ifscCode || '-'}</div>
+              <div><strong>UPI:</strong> {form.upi || '-'}</div>
+            </div>
+            {form.aadhar_front && <p style={{ marginTop: 12, color: '#059669' }}>✅ Aadhar uploaded</p>}
+            {form.pan_front && <p style={{ color: '#059669' }}>✅ PAN uploaded</p>}
+            {form.certificate_image && <p style={{ color: '#059669' }}>✅ Certificate uploaded</p>}
+            {form.profileImage && <p style={{ color: '#059669' }}>✅ Profile photo uploaded</p>}
+            {form.termsAccepted && <p style={{ color: '#059669' }}>✅ Terms accepted</p>}
+            <p style={{ marginTop: 16, color: '#6b7280', fontSize: '0.85rem' }}>Please review all details. After submission, admin will schedule an interview for verification.</p>
           </div>
         )}
 
