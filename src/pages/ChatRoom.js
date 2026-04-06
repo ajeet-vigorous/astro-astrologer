@@ -4,12 +4,14 @@ import { chatApi, pujaApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
+import { useActiveChat } from '../context/ActiveChatContext';
 
 const SOCKET_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 const ChatRoom = () => {
   const { chatId } = useParams();
   const { astrologer } = useAuth();
+  const { startChat, endChat: clearActiveChat } = useActiveChat();
   const navigate = useNavigate();
   const [chatDetail, setChatDetail] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -49,7 +51,10 @@ const ChatRoom = () => {
       if (detailRes.status === 'fulfilled') {
         const d = detailRes.value.data;
         const chat = d?.recordList || d?.data;
-        if (chat) setChatDetail(chat);
+        if (chat) {
+          setChatDetail(chat);
+          startChat({ id: chatId, userId: chat.userId, userName: chat.userName, profileImage: chat.profileImage, chatStatus: chat.chatStatus, chatRate: chat.chatRate, startTime: Date.now() });
+        }
       }
 
       if (msgRes.status === 'fulfilled') {
@@ -77,11 +82,21 @@ const ChatRoom = () => {
     const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
     });
+
+    socketRef.current = socket; // Set ref BEFORE listeners
 
     socket.on('connect', () => {
       console.log('Astrologer chat socket connected');
       socket.emit('join-chat', { chatRequestId: chatId });
+      // Sync messages on reconnect
+      chatApi.getMessages({ chatRequestId: chatId }).then(res => {
+        const msgs = res.data?.recordList || res.data?.data || [];
+        if (Array.isArray(msgs) && msgs.length > 0) setMessages(msgs);
+      }).catch(() => {});
     });
 
     socket.on('new-message', (msg) => {
@@ -89,22 +104,57 @@ const ChatRoom = () => {
         if (prev.find(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+      // If message is from customer (other person), mark as delivered then read
+      if (msg.senderType === 'user' && msg.senderId !== astrologer?.id) {
+        socket.emit('message-delivered', { chatRequestId: parseInt(chatId), messageIds: [msg.id] });
+        // Mark as read after 2 sec (chat screen is open)
+        setTimeout(() => {
+          if (socketRef.current?.connected) {
+            socketRef.current.emit('message-read', { chatRequestId: parseInt(chatId), messageIds: [msg.id] });
+          }
+        }, 2000);
+      }
+    });
+
+    // Message status updates (sent → delivered → read)
+    socket.on('messages-status-update', ({ messageIds, status }) => {
+      setMessages(prev => prev.map(m => messageIds.includes(m.id) ? { ...m, status } : m));
     });
 
     socket.on('chat-ended', (data) => {
       if (timerRef.current) clearInterval(timerRef.current);
       toast.info(data.message || 'Chat session ended');
       setChatDetail(prev => ({ ...prev, chatStatus: 'Completed' }));
+      clearActiveChat();
     });
 
-    socket.on('user-typing', () => setTyping(true));
-    socket.on('user-stop-typing', () => setTyping(false));
+    // Chat cancelled by customer (Pending state)
+    socket.on('chat-cancelled', (data) => {
+      toast.info(data.message || 'Customer cancelled the chat request');
+      setChatDetail(prev => ({ ...prev, chatStatus: 'Cancelled' }));
+      clearActiveChat();
+      setTimeout(() => navigate('/'), 2000);
+    });
+
+    // Customer disconnected
+    socket.on('user-disconnected', (data) => {
+      if (data.userType !== 'astrologer') {
+        toast.warning('Customer disconnected. Waiting 30s for reconnect...', { autoClose: 10000 });
+      }
+    });
+
+    // Typing - only show when OTHER person (customer/user) is typing
+    socket.on('user-typing', (data) => {
+      if (data?.userType !== 'astrologer') setTyping(true);
+    });
+    socket.on('user-stop-typing', (data) => {
+      if (data?.userType !== 'astrologer') setTyping(false);
+    });
 
     socket.on('connect_error', (err) => {
       console.error('Socket error:', err.message);
     });
 
-    socketRef.current = socket;
   };
 
   const handleSend = async (e) => {
@@ -148,10 +198,12 @@ const ChatRoom = () => {
   };
 
   const handleEndChat = () => {
+    if (!window.confirm('Are you sure you want to end this chat?')) return;
     if (socketRef.current?.connected) {
       socketRef.current.emit('end-chat', { chatRequestId: chatId });
     }
     if (timerRef.current) clearInterval(timerRef.current);
+    clearActiveChat();
     navigate('/');
   };
 
@@ -260,7 +312,14 @@ const ChatRoom = () => {
                 className={`msg-bubble ${msg.senderType === 'astrologer' ? 'sent' : 'received'}`}
               >
                 <p className="msg-text">{msg.message}</p>
-                <span className="msg-time">{formatMsgTime(msg.created_at)}</span>
+                <span className="msg-time">
+                  {formatMsgTime(msg.created_at)}
+                  {msg.senderType === 'astrologer' && (
+                    <span style={{ marginLeft: 4, fontSize: '0.7rem', letterSpacing: -1, color: msg.status === 'read' ? '#34d399' : msg.status === 'delivered' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)' }}>
+                      {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </span>
               </div>
             )
           ))

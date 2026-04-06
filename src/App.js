@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ActiveChatProvider, useActiveChatRedirect } from './context/ActiveChatContext';
+import FloatingChatBubble from './components/FloatingChatBubble';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
@@ -74,8 +76,11 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <AppRoutes />
-        <ToastContainer position="top-right" autoClose={3000} />
+        <ActiveChatProvider>
+          <AppRoutes />
+          <FloatingChatBubble />
+          <ToastContainer position="top-right" autoClose={3000} />
+        </ActiveChatProvider>
       </Router>
     </AuthProvider>
   );
