@@ -11,18 +11,10 @@ export async function createZegoSession({ sdkConfig, localEl, remoteEl, isVideo 
     sdkConfig.serverUrl || 'wss://webliveroom-api.zegocloud.com/ws'
   );
 
-  await zg.loginRoom(sdkConfig.roomID, sdkConfig.token, {
-    userID: String(sdkConfig.userID),
-    userName: sdkConfig.userName || `user_${sdkConfig.userID}`,
-  });
-
-  const localStream = await zg.createStream({ camera: { audio: true, video: isVideo } });
-  if (localEl) localEl.srcObject = localStream;
-  const publishStreamId = `stream_${sdkConfig.userID}`;
-  await zg.startPublishingStream(publishStreamId, localStream);
-
   const remoteStreams = new Map();
 
+  // CRITICAL: Register `roomStreamUpdate` BEFORE loginRoom() — otherwise we miss
+  // ADD events for streams from peers who joined first (one-way audio bug).
   zg.on('roomStreamUpdate', async (rid, updateType, streamList) => {
     if (updateType === 'ADD') {
       for (const s of streamList) {
@@ -39,6 +31,16 @@ export async function createZegoSession({ sdkConfig, localEl, remoteEl, isVideo 
       }
     }
   });
+
+  await zg.loginRoom(sdkConfig.roomID, sdkConfig.token, {
+    userID: String(sdkConfig.userID),
+    userName: sdkConfig.userName || `user_${sdkConfig.userID}`,
+  });
+
+  const localStream = await zg.createStream({ camera: { audio: true, video: isVideo } });
+  if (localEl) localEl.srcObject = localStream;
+  const publishStreamId = `stream_${sdkConfig.userID}`;
+  await zg.startPublishingStream(publishStreamId, localStream);
 
   return {
     provider: 'zego',

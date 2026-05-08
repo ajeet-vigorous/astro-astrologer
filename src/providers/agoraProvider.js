@@ -5,6 +5,21 @@ export async function createAgoraSession({ sdkConfig, localEl, remoteEl, isVideo
   const AgoraRTC = (await import('agora-rtc-sdk-ng')).default;
   const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
+  // CRITICAL: Register `user-published` listener BEFORE join() and publish().
+  // Otherwise we miss publish events from peers who joined first — causes one-way
+  // audio (other side hears us, we don't hear them).
+  client.on('user-published', async (remoteUser, mediaType) => {
+    try {
+      await client.subscribe(remoteUser, mediaType);
+      if (mediaType === 'video' && remoteEl && remoteUser.videoTrack) {
+        remoteUser.videoTrack.play(remoteEl);
+      }
+      if (mediaType === 'audio' && remoteUser.audioTrack) {
+        remoteUser.audioTrack.play();
+      }
+    } catch (e) { console.error('Agora subscribe failed:', e); }
+  });
+
   await client.join(sdkConfig.appId, sdkConfig.channel, sdkConfig.token, sdkConfig.uid || 0);
 
   // Network quality samples — Agora fires every ~2s. uplink/downlink: 1=excellent..6=down.
@@ -25,7 +40,42 @@ export async function createAgoraSession({ sdkConfig, localEl, remoteEl, isVideo
     }, 10000);
   }
 
-  const localAudio = await AgoraRTC.createMicrophoneAudioTrack();
+  // Noise cancellation: 2-layer stack (browser 3A always + AINS extension if loadable).
+  // See customer agoraProvider.js for full explanation. Same pattern, just mirrored.
+  let denoiser = null;
+  let denoiserProcessor = null;
+  try {
+    const { AIDenoiserExtension } = await import('agora-extension-ai-denoiser');
+    const ext = new AIDenoiserExtension({ assetsPath: '/agora-ai-denoiser' });
+    if (ext.checkCompatibility()) {
+      AgoraRTC.registerExtensions([ext]);
+      denoiser = ext;
+    } else {
+      console.warn('[agora] AINS not compatible, browser 3A only');
+    }
+  } catch (e) {
+    console.warn('[agora] AINS load failed, browser 3A only:', e?.message);
+  }
+
+  const localAudio = await AgoraRTC.createMicrophoneAudioTrack({
+    AEC: true,
+    AGC: true,
+    ANS: true,
+    encoderConfig: 'speech_standard',
+  });
+
+  if (denoiser) {
+    try {
+      denoiserProcessor = denoiser.createProcessor();
+      localAudio.pipe(denoiserProcessor).pipe(localAudio.processorDestination);
+      await denoiserProcessor.enable();
+      console.log('[agora] AI Noise Suppression active (AINS)');
+    } catch (e) {
+      console.warn('[agora] AINS processor setup failed:', e?.message);
+      denoiserProcessor = null;
+    }
+  }
+
   let localVideo = null;
   if (isVideo) {
     localVideo = await AgoraRTC.createCameraVideoTrack();
@@ -33,22 +83,15 @@ export async function createAgoraSession({ sdkConfig, localEl, remoteEl, isVideo
   }
   await client.publish(isVideo ? [localAudio, localVideo] : [localAudio]);
 
-  client.on('user-published', async (remoteUser, mediaType) => {
-    try {
-      await client.subscribe(remoteUser, mediaType);
-      if (mediaType === 'video' && remoteEl && remoteUser.videoTrack) {
-        remoteUser.videoTrack.play(remoteEl);
-      }
-      if (mediaType === 'audio' && remoteUser.audioTrack) {
-        remoteUser.audioTrack.play();
-      }
-    } catch (e) { console.error('Agora subscribe failed:', e); }
-  });
-
   return {
     provider: 'agora',
     async leave() {
       if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
+      if (denoiserProcessor) {
+        try { await denoiserProcessor.disable(); } catch (_) {}
+        try { await denoiserProcessor.destroy(); } catch (_) {}
+        denoiserProcessor = null;
+      }
       try { localAudio?.stop(); localAudio?.close(); } catch (e) {}
       try { localVideo?.stop(); localVideo?.close(); } catch (e) {}
       try { await client.leave(); } catch (e) {}
