@@ -26,6 +26,7 @@ export const chatApi = {
   getMessages: (data) => API.post('/customer/chatRequest/getMessages', data),
   sendMessage: (data) => API.post('/customer/chatRequest/sendMessage', data),
   getChatDetail: (data) => API.post('/customer/chatRequest/getChatDetail', data),
+  getIntakeForm: (data) => API.post('/customer/chatRequest/getIntakeForm', data),
   endChat: (data) => API.post('/customer/chatRequest/endChat', data),
   updateStatus: (data) => API.post('/customer/addStatus', data),
   getChatHistory: (data) => API.post('/customer/getChatHistory', data),
@@ -42,6 +43,7 @@ export const callApi = {
   getCallHistory: (data) => API.post('/customer/getCallHistory', data),
   getCallById: (data) => API.post('/customer/getCallById', data),
   getZegoToken: (data) => API.post('/customer/zegocloud/token', data),
+  postMetrics: (data) => API.post('/customer/call/metrics', data),
 };
 
 // Wallet & Withdraw

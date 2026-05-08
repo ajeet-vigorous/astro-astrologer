@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { callApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
+import { createCallSession } from '../providers';
 import { toast } from 'react-toastify';
 import io from 'socket.io-client';
 
@@ -12,12 +13,19 @@ const CallRoom = () => {
   const { astrologer } = useAuth();
   const navigate = useNavigate();
   const socketRef = useRef(null);
-  const zegoRef = useRef(null);
+  const sessionRef = useRef(null);
 
   const [status, setStatus] = useState('Connecting');
   const [callData, setCallData] = useState(null);
   const [timer, setTimer] = useState(0);
+  const [connStatus, setConnStatus] = useState('connected');
+  const [connMessage, setConnMessage] = useState('');
   const timerRef = useRef(null);
+  const heartbeatRef = useRef(null);
+  const callIdRef = useRef(null);
+  const tokenRefreshRef = useRef(null);
+  const metricsBufferRef = useRef([]);
+  const metricsFlushRef = useRef(null);
 
   useEffect(() => {
     if (!callId || !astrologer) return;
@@ -28,6 +36,46 @@ const CallRoom = () => {
 
     socket.on('connect', () => {
       socket.emit('join-call', { callId: parseInt(callId) });
+      // On reconnect during active call, refresh heartbeat so server marks us alive immediately
+      if (callIdRef.current) {
+        socket.emit('call-heartbeat', { callId: callIdRef.current });
+        setConnStatus('connected');
+        setConnMessage('');
+      }
+    });
+
+    // Local socket lost — show "Reconnecting..." overlay
+    socket.on('disconnect', () => {
+      if (callIdRef.current) {
+        setConnStatus('reconnecting');
+        setConnMessage('Connection lost — reconnecting...');
+      }
+    });
+    socket.io.on('reconnect_attempt', () => {
+      if (callIdRef.current) {
+        setConnStatus('reconnecting');
+        setConnMessage('Reconnecting to call...');
+      }
+    });
+    socket.io.on('reconnect', () => {
+      if (callIdRef.current) {
+        setConnStatus('connected');
+        setConnMessage('');
+        toast.success('Reconnected');
+      }
+    });
+
+    // Peer (customer) disconnected — show overlay
+    socket.on('peer-connection-lost', (data) => {
+      const sideLabel = data.disconnectedSide === 'customer' ? 'Customer' : 'Other side';
+      setConnStatus('peer_lost');
+      setConnMessage(`${sideLabel} disconnected. Waiting up to ${data.reconnectTimeout || 30}s...`);
+    });
+    socket.on('peer-reconnected', (data) => {
+      setConnStatus('connected');
+      setConnMessage('');
+      const sideLabel = data.reconnectedSide === 'customer' ? 'Customer' : 'Other side';
+      toast.success(`${sideLabel} reconnected`);
     });
 
     // Fetch call details
@@ -36,8 +84,8 @@ const CallRoom = () => {
       setCallData(c);
       if (c?.callStatus === 'Accepted') {
         setStatus('Active');
-        startZegoCall(c).catch(err => {
-          console.error('startZegoCall failed:', err);
+        startCall(c).catch(err => {
+          console.error('startCall failed:', err);
           toast.error('Failed to connect: ' + (err.message || ''));
         });
       }
@@ -46,15 +94,15 @@ const CallRoom = () => {
     socket.on('call-accepted', (data) => {
       setStatus('Active');
       setCallData(prev => ({ ...prev, ...data }));
-      startZegoCall(data).catch(err => {
-        console.error('startZegoCall on accept failed:', err);
+      startCall(data).catch(err => {
+        console.error('startCall on accept failed:', err);
         toast.error('Failed to connect: ' + (err.message || ''));
       });
     });
 
-    socket.on('call-ended', () => {
+    socket.on('call-ended', async () => {
       setStatus('Completed');
-      stopZegoCall();
+      await stopCall();
       if (timerRef.current) clearInterval(timerRef.current);
     });
 
@@ -63,89 +111,112 @@ const CallRoom = () => {
     });
 
     return () => {
+      if (heartbeatRef.current) { clearInterval(heartbeatRef.current); heartbeatRef.current = null; }
+      if (tokenRefreshRef.current) { clearInterval(tokenRefreshRef.current); tokenRefreshRef.current = null; }
+      if (metricsFlushRef.current) { clearInterval(metricsFlushRef.current); metricsFlushRef.current = null; }
       socket.disconnect();
-      stopZegoCall();
+      stopCall();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [callId, astrologer]);
 
-  const startZegoCall = async (data) => {
+  const startCall = async (data) => {
     try {
-      const tokenRes = await callApi.getZegoToken({ callId: parseInt(callId), userId: astrologer?.userId, isAstrologer: true });
+      const tokenRes = await callApi.getZegoToken({
+        callId: parseInt(callId),
+        userId: astrologer?.userId,
+        isAstrologer: true,
+      });
       if (tokenRes.data?.status !== 200) { toast.error('Failed to get call token'); return; }
-      const { appID, roomID, userID, token, provider, serverUrl } = tokenRes.data;
-      const isVideo = data.call_type == 11 || data.call_type === 'Video';
-      const userName = astrologer?.name || 'Astrologer';
 
-      if (provider === 'zego') {
-        const zegoModule = await import('zego-express-engine-webrtc');
-        const ZegoExpressEngine = zegoModule.ZegoExpressEngine || zegoModule.default;
-        if (!ZegoExpressEngine) { toast.error('Zegocloud SDK not loaded'); return; }
-        const zg = new ZegoExpressEngine(appID, serverUrl || 'wss://webliveroom-api.zegocloud.com/ws');
-        zegoRef.current = zg;
-        await zg.loginRoom(roomID, token, { userID: String(userID), userName });
-        const localStream = await zg.createStream({ camera: { audio: true, video: isVideo } });
-        const localEl = document.getElementById('local-stream');
-        if (localEl) localEl.srcObject = localStream;
-        await zg.startPublishingStream(`stream_${userID}`, localStream);
-        zg.on('roomStreamUpdate', async (rid, updateType, streamList) => {
-          if (updateType === 'ADD') {
-            for (const s of streamList) {
-              const remote = await zg.startPlayingStream(s.streamID);
-              const el = document.getElementById('remote-stream');
-              if (el) el.srcObject = remote;
-            }
-          }
-        });
-      } else if (provider === 'agora') {
-        const AgoraRTC = (await import('agora-rtc-sdk-ng')).default;
-        const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-        zegoRef.current = { agoraClient: client, localTracks: [] };
-        await client.join(appID, roomID, token, parseInt(userID) || 0);
-        const [micTrack, camTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-        zegoRef.current.localTracks = isVideo ? [micTrack, camTrack] : [micTrack];
-        if (isVideo) { camTrack.play(document.getElementById('local-stream')); await client.publish([micTrack, camTrack]); }
-        else { await client.publish([micTrack]); }
-        client.on('user-published', async (remoteUser, mediaType) => {
-          await client.subscribe(remoteUser, mediaType);
-          if (mediaType === 'video') remoteUser.videoTrack.play(document.getElementById('remote-stream'));
-          if (mediaType === 'audio') remoteUser.audioTrack.play();
-        });
-      } else if (provider === 'hms') {
-        const { HMSReactiveStore } = await import('@100mslive/hms-video-store');
-        const hms = new HMSReactiveStore();
-        const hmsActions = hms.getHMSActions();
-        zegoRef.current = { hmsActions };
-        await hmsActions.join({ authToken: token, userName, settings: { isAudioMuted: false, isVideoMuted: !isVideo } });
-      }
+      const isVideo = data.call_type == 11 || data.call_type === 'Video';
+      const localEl = document.getElementById('local-stream');
+      const remoteEl = document.getElementById('remote-stream');
+
+      sessionRef.current = await createCallSession({
+        tokenResponse: tokenRes.data,
+        localEl,
+        remoteEl,
+        isVideo,
+        onStats: (ev) => { metricsBufferRef.current.push({ ...ev, ts: Date.now() }); },
+      });
 
       timerRef.current = setInterval(() => setTimer(prev => prev + 1), 1000);
+
+      // Drop-detection: emit heartbeat every 10s. Server auto-ends call if no heartbeat
+      // from this side for 30s+ (handles browser crash, network drop, app force-close).
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      const cid = parseInt(callId);
+      callIdRef.current = cid; // remember active callId for reconnect handlers
+      const sock = socketRef.current;
+      if (sock) sock.emit('call-heartbeat', { callId: cid });
+      heartbeatRef.current = setInterval(() => {
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit('call-heartbeat', { callId: cid });
+        }
+      }, 10000);
+
+      // Quality metrics — flush buffered provider stats every 30s in a batch
+      if (metricsFlushRef.current) clearInterval(metricsFlushRef.current);
+      metricsFlushRef.current = setInterval(() => {
+        const buf = metricsBufferRef.current;
+        if (!buf.length) return;
+        const events = buf.splice(0, buf.length);
+        callApi.postMetrics({ callId: cid, events }).catch(() => {});
+      }, 30000);
+
+      // Token refresh for long calls (>1hr). Backend issues 4-hour tokens; we refresh
+      // every 50 minutes so a fresh token is in place well before any expiry boundary.
+      // HMS provider's renewToken is a no-op (HMS auth tokens valid 24hr+).
+      if (tokenRefreshRef.current) clearInterval(tokenRefreshRef.current);
+      tokenRefreshRef.current = setInterval(async () => {
+        try {
+          const refreshRes = await callApi.getZegoToken({
+            callId: cid,
+            userId: astrologer?.userId,
+            isAstrologer: true,
+          });
+          if (refreshRes.data?.status !== 200) return;
+          const newToken =
+            refreshRes.data?.sdkConfig?.token ||
+            refreshRes.data?.sdkConfig?.authToken ||
+            refreshRes.data?.token;
+          if (newToken && sessionRef.current?.renewToken) {
+            await sessionRef.current.renewToken(newToken);
+            console.log('[token] Refreshed for long call');
+          }
+        } catch (e) {
+          console.error('[token] Refresh failed:', e);
+        }
+      }, 50 * 60 * 1000);
     } catch (err) {
       console.error('Call error:', err);
-      toast.error('Failed to connect: ' + (err.message || ''));
+      toast.error('Failed to connect: ' + (err?.message || 'unknown'));
     }
   };
 
-  const stopZegoCall = () => {
-    if (!zegoRef.current) return;
-    try {
-      if (zegoRef.current.agoraClient) {
-        zegoRef.current.localTracks?.forEach(t => { t.stop(); t.close(); });
-        zegoRef.current.agoraClient.leave();
-      } else if (zegoRef.current.hmsActions) {
-        zegoRef.current.hmsActions.leave();
-      } else {
-        zegoRef.current.stopPublishingStream();
-        zegoRef.current.logoutRoom();
-        zegoRef.current.destroyEngine();
+  const stopCall = async () => {
+    if (heartbeatRef.current) { clearInterval(heartbeatRef.current); heartbeatRef.current = null; }
+    if (tokenRefreshRef.current) { clearInterval(tokenRefreshRef.current); tokenRefreshRef.current = null; }
+    if (metricsFlushRef.current) {
+      clearInterval(metricsFlushRef.current); metricsFlushRef.current = null;
+      const buf = metricsBufferRef.current;
+      if (buf.length && callIdRef.current) {
+        const events = buf.splice(0, buf.length);
+        callApi.postMetrics({ callId: callIdRef.current, events }).catch(() => {});
       }
-    } catch (e) {}
-    zegoRef.current = null;
+    }
+    callIdRef.current = null;
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (session) {
+      try { await session.leave(); } catch (e) { console.error('Leave failed:', e); }
+    }
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
     if (socketRef.current) socketRef.current.emit('end-call', { callId: parseInt(callId) });
-    stopZegoCall();
+    await stopCall();
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
@@ -164,6 +235,20 @@ const CallRoom = () => {
             <h3>{callData?.userName || 'Customer'}</h3>
             <p style={{ color: '#a78bfa' }}>{isVideo ? 'Video' : 'Audio'} Call</p>
             <p style={{ color: '#c4b5d8', marginTop: 12 }}>Connecting...</p>
+          </div>
+        )}
+
+        {/* Reconnection overlay (during active call only) */}
+        {status === 'Active' && connStatus !== 'connected' && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
+            background: connStatus === 'reconnecting' ? '#f59e0b' : '#dc2626',
+            color: '#fff', padding: '10px 16px', textAlign: 'center',
+            fontWeight: 600, fontSize: '0.9rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}>
+            <span style={{ marginRight: 8 }}>{connStatus === 'reconnecting' ? '🔄' : '⚠️'}</span>
+            {connMessage || (connStatus === 'reconnecting' ? 'Reconnecting...' : 'Connection issue')}
           </div>
         )}
 

@@ -14,6 +14,8 @@ const ChatRoom = () => {
   const { startChat, endChat: clearActiveChat } = useActiveChat();
   const navigate = useNavigate();
   const [chatDetail, setChatDetail] = useState(null);
+  const [intakeForm, setIntakeForm] = useState(null);
+  const [showIntakeCard, setShowIntakeCard] = useState(true);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -43,9 +45,10 @@ const ChatRoom = () => {
   const initChat = async () => {
     setLoading(true);
     try {
-      const [detailRes, msgRes] = await Promise.allSettled([
+      const [detailRes, msgRes, intakeRes] = await Promise.allSettled([
         chatApi.getChatDetail({ chatRequestId: chatId }),
         chatApi.getMessages({ chatRequestId: chatId }),
+        chatApi.getIntakeForm({ chatRequestId: chatId }),
       ]);
 
       if (detailRes.status === 'fulfilled') {
@@ -61,6 +64,15 @@ const ChatRoom = () => {
         const d = msgRes.value.data;
         const msgs = d?.recordList || d?.data || [];
         if (Array.isArray(msgs)) setMessages(msgs);
+      }
+
+      if (intakeRes.status === 'fulfilled') {
+        const d = intakeRes.value.data;
+        const form = d?.recordList || d?.data || d;
+        // Only set if we actually got meaningful form data
+        if (form && (form.name || form.birthDate || form.topicOfConcern)) {
+          setIntakeForm(form);
+        }
       }
 
       connectSocket();
@@ -289,6 +301,40 @@ const ChatRoom = () => {
             )}
             <button onClick={() => setShowPujaModal(false)} style={{ marginTop: 16, width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontWeight: 500 }}>Close</button>
           </div>
+        </div>
+      )}
+
+      {/* Customer Intake Form card — shows what the customer filled before starting chat */}
+      {intakeForm && showIntakeCard && (
+        <div style={{
+          margin: '10px 12px 0',
+          padding: '12px 14px',
+          background: '#faf7ff',
+          border: '1px solid #e0d4f5',
+          borderRadius: 10,
+          fontSize: '0.85rem',
+          position: 'relative',
+        }}>
+          <button
+            onClick={() => setShowIntakeCard(false)}
+            style={{ position: 'absolute', top: 6, right: 8, background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
+            title="Hide"
+          >&times;</button>
+          <div style={{ fontWeight: 700, color: '#7c3aed', marginBottom: 6, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>Customer Intake</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px 14px', color: '#1a0533' }}>
+            {intakeForm.name && <div><strong>Name:</strong> {intakeForm.name}</div>}
+            {intakeForm.gender && <div><strong>Gender:</strong> {intakeForm.gender}</div>}
+            {intakeForm.birthDate && <div><strong>DOB:</strong> {String(intakeForm.birthDate).split('T')[0]}</div>}
+            {intakeForm.birthTime && <div><strong>Birth Time:</strong> {intakeForm.birthTime}</div>}
+            {intakeForm.birthPlace && <div><strong>Birth Place:</strong> {intakeForm.birthPlace}</div>}
+            {intakeForm.maritalStatus && <div><strong>Marital:</strong> {intakeForm.maritalStatus}</div>}
+            {intakeForm.occupation && <div><strong>Occupation:</strong> {intakeForm.occupation}</div>}
+          </div>
+          {intakeForm.topicOfConcern && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #c4b5fd', color: '#1a0533' }}>
+              <strong style={{ color: '#7c3aed' }}>Concern:</strong> {intakeForm.topicOfConcern}
+            </div>
+          )}
         </div>
       )}
 

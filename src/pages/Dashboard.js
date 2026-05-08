@@ -187,7 +187,8 @@ const Dashboard = () => {
 
   const handleStatusChange = async (type, value) => {
     try {
-      await chatApi.updateStatus({
+      const api = type === 'chat' ? chatApi : callApi;
+      await api.updateStatus({
         astrologerId: astrologer?.id,
         status: value,
       });
