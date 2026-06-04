@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { chatApi, callApi, boostApi } from '../api/services';
+import { chatApi, callApi, boostApi, waitlistApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
@@ -17,22 +17,36 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [boostInfo, setBoostInfo] = useState(null);
   const [boosting, setBoosting] = useState(false);
+  const [waitlist, setWaitlist] = useState([]);   // customers waiting in this astrologer's queue
+  const [showQueue, setShowQueue] = useState(false);  // toggle full queue panel
   const socketRef = useRef(null);
   const pollRef = useRef(null);
 
   useEffect(() => {
     fetchRequests();
+    fetchWaitlist();
     connectSocket();
     boostApi.getInfo({ astrologer_id: astrologer?.id }).then(res => setBoostInfo(res.data)).catch(() => {});
 
-    // Poll for new requests every 5 seconds
-    pollRef.current = setInterval(fetchRequests, 5000);
+    // Poll for new requests + waitlist every 5 seconds (socket is primary, this is fallback)
+    pollRef.current = setInterval(() => {
+      fetchRequests();
+      fetchWaitlist();
+    }, 5000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (socketRef.current) socketRef.current.disconnect();
     };
   }, []);
+
+  const fetchWaitlist = async () => {
+    if (!astrologer?.id) return;
+    try {
+      const res = await waitlistApi.forAstrologer({ astrologerId: astrologer.id });
+      setWaitlist(res.data?.queue || []);
+    } catch (e) { /* silent */ }
+  };
 
   // Notification sound
   const playNotificationSound = () => {
@@ -63,7 +77,7 @@ const Dashboard = () => {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
     });
 
     socket.on('connect', () => {
@@ -93,6 +107,20 @@ const Dashboard = () => {
         toast.info(`New ${callType} call request received!`, { autoClose: 10000 });
         fetchRequests(); // Refresh list
       }
+    });
+
+    // Waitlist live updates — customer joined/left queue, position changes
+    socket.on('waitlist:queue-update', (data) => {
+      if (Number(data.astrologerId) === Number(astrologer?.id)) {
+        setWaitlist(data.queue || []);
+      }
+    });
+
+    // Auto-trigger: a customer from queue is being asked to start the call now
+    socket.on('waitlist:next-picked', (data) => {
+      playNotificationSound();
+      toast.info(`Next customer ready: ${data.userName || 'Customer'} (from queue)`, { autoClose: 8000 });
+      fetchWaitlist();
     });
 
     socketRef.current = socket;
@@ -260,6 +288,65 @@ const Dashboard = () => {
       )}
 
       <div className="dashboard-content">
+        {/* Waitlist widget — customers waiting in queue */}
+        {waitlist.length > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+            border: '2px solid #f59e0b',
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 20,
+            cursor: 'pointer',
+          }} onClick={() => setShowQueue(!showQueue)}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <strong style={{ fontSize: '1.1rem', color: '#92400e' }}>
+                  ⏳ {waitlist.length} customer{waitlist.length > 1 ? 's' : ''} waiting in queue
+                </strong>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#78350f' }}>
+                  {showQueue ? 'Click to hide list' : 'Click to view all waiting customers'}
+                </p>
+              </div>
+              <span style={{ fontSize: '1.5rem' }}>{showQueue ? '▲' : '▼'}</span>
+            </div>
+            {showQueue && (
+              <div style={{ marginTop: 12, background: '#fff', borderRadius: 8, padding: 12 }}>
+                {waitlist.map(w => (
+                  <div key={w.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '8px 0', borderBottom: '1px solid #fef3c7',
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%',
+                      background: '#7c3aed', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 700, fontSize: 14,
+                    }}>
+                      {w.position}
+                    </div>
+                    <img
+                      src={w.profile ? (w.profile.startsWith('http') ? w.profile : `http://localhost:5000/${w.profile}`) : '/default-avatar.png'}
+                      alt={w.name || 'User'}
+                      style={{ width: 36, height: 36, borderRadius: '50%' }}
+                      onError={(e) => { e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23e0d4f5"/><text x="50" y="55" text-anchor="middle" font-size="40" fill="%237c3aed">U</text></svg>'; }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: '#1f2937' }}>{w.name || `User #${w.userId}`}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                        {w.requestType} • waiting {w.waitingMin || 0} min
+                        {w.status === 'notified' && <span style={{ color: '#16a34a', marginLeft: 8, fontWeight: 700 }}>● READY</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <p style={{ fontSize: '0.75rem', color: '#78350f', marginTop: 8, textAlign: 'center' }}>
+                  Auto-routed to next when your current call ends
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <h3>Chat Requests ({chatRequests.length})</h3>
 
         {loading ? (

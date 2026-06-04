@@ -46,6 +46,11 @@ export const callApi = {
   postMetrics: (data) => API.post('/customer/call/metrics', data),
 };
 
+// Waitlist (queue) — astrologer views their queue
+export const waitlistApi = {
+  forAstrologer: (data) => API.post('/customer/waitlist/forAstrologer', data),
+};
+
 // Wallet & Withdraw
 export const walletApi = {
   getBalance: () => API.post('/customer/getWalletBalance'),

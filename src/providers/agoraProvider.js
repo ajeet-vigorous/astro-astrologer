@@ -40,41 +40,10 @@ export async function createAgoraSession({ sdkConfig, localEl, remoteEl, isVideo
     }, 10000);
   }
 
-  // Noise cancellation: 2-layer stack (browser 3A always + AINS extension if loadable).
-  // See customer agoraProvider.js for full explanation. Same pattern, just mirrored.
-  let denoiser = null;
-  let denoiserProcessor = null;
-  try {
-    const { AIDenoiserExtension } = await import('agora-extension-ai-denoiser');
-    const ext = new AIDenoiserExtension({ assetsPath: '/agora-ai-denoiser' });
-    if (ext.checkCompatibility()) {
-      AgoraRTC.registerExtensions([ext]);
-      denoiser = ext;
-    } else {
-      console.warn('[agora] AINS not compatible, browser 3A only');
-    }
-  } catch (e) {
-    console.warn('[agora] AINS load failed, browser 3A only:', e?.message);
-  }
-
-  const localAudio = await AgoraRTC.createMicrophoneAudioTrack({
-    AEC: true,
-    AGC: true,
-    ANS: true,
-    encoderConfig: 'speech_standard',
-  });
-
-  if (denoiser) {
-    try {
-      denoiserProcessor = denoiser.createProcessor();
-      localAudio.pipe(denoiserProcessor).pipe(localAudio.processorDestination);
-      await denoiserProcessor.enable();
-      console.log('[agora] AI Noise Suppression active (AINS)');
-    } catch (e) {
-      console.warn('[agora] AINS processor setup failed:', e?.message);
-      denoiserProcessor = null;
-    }
-  }
+  // Default mic — browser 3A (AEC/AGC/ANS) ON by default. AINS extension temporarily
+  // disabled (pipe-on-fail caused both directions silent on mobile). Will re-enable
+  // properly once base calling is verified stable.
+  const localAudio = await AgoraRTC.createMicrophoneAudioTrack();
 
   let localVideo = null;
   if (isVideo) {
@@ -87,11 +56,6 @@ export async function createAgoraSession({ sdkConfig, localEl, remoteEl, isVideo
     provider: 'agora',
     async leave() {
       if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
-      if (denoiserProcessor) {
-        try { await denoiserProcessor.disable(); } catch (_) {}
-        try { await denoiserProcessor.destroy(); } catch (_) {}
-        denoiserProcessor = null;
-      }
       try { localAudio?.stop(); localAudio?.close(); } catch (e) {}
       try { localVideo?.stop(); localVideo?.close(); } catch (e) {}
       try { await client.leave(); } catch (e) {}

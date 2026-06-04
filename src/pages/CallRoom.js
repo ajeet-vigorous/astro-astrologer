@@ -31,7 +31,7 @@ const CallRoom = () => {
     if (!callId || !astrologer) return;
 
     const token = localStorage.getItem('astrologerToken');
-    const socket = io(SOCKET_URL, { auth: { token } });
+    const socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {
