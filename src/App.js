@@ -31,6 +31,7 @@ import StaticPage from './pages/StaticPage';
 import Contact from './pages/Contact';
 import TrainingVideos from './pages/TrainingVideos';
 import BankDetails from './pages/BankDetails';
+import Form16A from './pages/Form16A';
 import Layout from './components/Layout';
 import './App.css';
 
@@ -67,6 +68,7 @@ function AppRoutes() {
       <Route path="/blog/:id" element={<ProtectedRoute><BlogDetail /></ProtectedRoute>} />
       <Route path="/training-videos" element={<ProtectedRoute><TrainingVideos /></ProtectedRoute>} />
       <Route path="/bank-details" element={<ProtectedRoute><BankDetails /></ProtectedRoute>} />
+      <Route path="/form-16a" element={<ProtectedRoute><Form16A /></ProtectedRoute>} />
       <Route path="/about" element={<ProtectedRoute><StaticPage /></ProtectedRoute>} />
       <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />
       <Route path="/privacy-policy" element={<ProtectedRoute><StaticPage /></ProtectedRoute>} />

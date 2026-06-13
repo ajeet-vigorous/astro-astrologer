@@ -93,6 +93,7 @@ const Header = () => {
             <Link to="/reviews" onClick={closeMenu}>Reviews</Link>
             <div className="dropdown-divider"></div>
             <Link to="/bank-details" onClick={closeMenu}>Bank Details</Link>
+            <Link to="/form-16a" onClick={closeMenu}>Form 16A (TDS)</Link>
             <Link to="/training-videos" onClick={closeMenu}>Training Videos</Link>
             <Link to="/terms-condition" onClick={closeMenu}>Terms &amp; Conditions</Link>
             <div className="dropdown-divider"></div>

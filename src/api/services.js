@@ -146,6 +146,10 @@ export const bankUpdateApi = {
   request: (data) => API.post('/astro/astrologer/bankUpdate/request', data),
 };
 
+export const form16aApi = {
+  my: (data) => API.post('/astro/astrologer/form16a/my', data),
+};
+
 export const pageApi = {
   getPage: (slug) => API.post('/pages/by-slug', { slug }),
   submitContact: (data) => API.post('/pages/contact', data),

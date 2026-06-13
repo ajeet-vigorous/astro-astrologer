@@ -21,6 +21,7 @@ const Wallet = () => {
   const [pgChargePercent, setPgChargePercent] = useState(2.5);
   const [savedBank, setSavedBank] = useState(null);
   const [savedUpi, setSavedUpi] = useState(null);
+  const [expandedWd, setExpandedWd] = useState(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -209,17 +210,48 @@ const Wallet = () => {
         <div className="section">
           <h3>Withdrawal Requests</h3>
           <table className="data-table">
-            <thead><tr><th>Amount</th><th>You Get</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
+            <thead><tr><th>Amount</th><th>You Get</th><th>Method</th><th>Status</th><th>Date</th><th>Breakup</th></tr></thead>
             <tbody>
-              {withdrawals.map((w, i) => (
-                <tr key={i}>
-                  <td>&#8377;{parseFloat(w.withdrawAmount || w.amount || 0).toFixed(2)}</td>
-                  <td className="text-green">&#8377;{parseFloat(w.pay_amount != null ? w.pay_amount : (w.withdrawAmount || w.amount || 0)).toFixed(2)}</td>
-                  <td>{w.paymentMethod || '-'}</td>
-                  <td><span className={`badge ${(w.status || '').toLowerCase()}`}>{w.status || 'Pending'}</span></td>
-                  <td>{w.created_at ? new Date(w.created_at).toLocaleDateString('en-IN') : '-'}</td>
-                </tr>
-              ))}
+              {withdrawals.map((w, i) => {
+                const amt = parseFloat(w.withdrawAmount || w.amount || 0);
+                const tds = parseFloat(w.tds_pay_amount || 0);
+                const payable = w.pay_amount != null ? parseFloat(w.pay_amount) : amt;
+                const pg = Math.max(0, amt - tds - payable);
+                const isOpen = expandedWd === i;
+                const brow = { display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', margin: '5px 0' };
+                return (
+                  <React.Fragment key={i}>
+                    <tr>
+                      <td>&#8377;{amt.toFixed(2)}</td>
+                      <td className="text-green">&#8377;{payable.toFixed(2)}</td>
+                      <td>{w.paymentMethod || '-'}</td>
+                      <td><span className={`badge ${(w.status || '').toLowerCase()}`}>{w.status || 'Pending'}</span></td>
+                      <td>{w.created_at ? new Date(w.created_at).toLocaleDateString('en-IN') : '-'}</td>
+                      <td>
+                        <button type="button" onClick={() => setExpandedWd(isOpen ? null : i)}
+                          style={{ background: 'none', border: '1px solid #c4b5fd', color: '#7c3aed', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                          {isOpen ? 'Hide' : 'View'}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={6} style={{ background: '#faf7ff', padding: 14 }}>
+                          <div style={{ maxWidth: 360 }}>
+                            <div style={{ fontWeight: 700, color: '#1a0533', marginBottom: 8 }}>Withdrawal Breakup</div>
+                            <div style={brow}><span>Withdraw Amount</span><span>&#8377;{amt.toFixed(2)}</span></div>
+                            <div style={{ ...brow, color: '#dc2626' }}><span>PG Charge</span><span>- &#8377;{pg.toFixed(2)}</span></div>
+                            <div style={{ ...brow, color: '#dc2626' }}><span>TDS</span><span>- &#8377;{tds.toFixed(2)}</span></div>
+                            <hr style={{ border: 'none', borderTop: '1px dashed #c4b5fd', margin: '8px 0' }} />
+                            <div style={{ ...brow, fontWeight: 700, color: '#16a34a' }}><span>Payable Amount</span><span>&#8377;{payable.toFixed(2)}</span></div>
+                            {w.Note && <p style={{ fontSize: '0.72rem', color: '#9ca3af', margin: '8px 0 0' }}>{w.Note}</p>}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
