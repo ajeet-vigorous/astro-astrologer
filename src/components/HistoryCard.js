@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { remedyApi } from '../api/services';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const REMEDY_CATEGORIES = ['Gemstone', 'Mantra', 'Puja', 'Daan', 'Other'];
 
 const fmtDate = (d) => {
   if (!d) return '-';
@@ -39,7 +44,32 @@ const Row = ({ label, value }) => (
   </div>
 );
 
-const HistoryCard = ({ item, type, onOpenKundli }) => {
+const HistoryCard = ({ item, type, onOpenKundli, onViewChat }) => {
+  const { astrologer } = useAuth();
+  const [remedyOpen, setRemedyOpen] = useState(false);
+  const [remedyCat, setRemedyCat] = useState(REMEDY_CATEGORIES[0]);
+  const [remedyText, setRemedyText] = useState('');
+  const [remedySaving, setRemedySaving] = useState(false);
+
+  const submitRemedy = async () => {
+    if (!remedyText.trim()) { toast.error('Please write the remedy'); return; }
+    setRemedySaving(true);
+    try {
+      await remedyApi.send({
+        astrologerId: astrologer?.id,
+        userId: item.userId,
+        chatRequestId: item.id,
+        category: remedyCat,
+        remedy: remedyText.trim(),
+      });
+      toast.success('Remedy sent to customer');
+      setRemedyOpen(false); setRemedyText(''); setRemedyCat(REMEDY_CATEGORIES[0]);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to send remedy');
+    }
+    setRemedySaving(false);
+  };
+
   const name = item.intakeName || item.userName || 'User';
   const gender = item.intakeGender || '-';
   const dob = fmtDob(item.intakeBirthDate, item.intakeBirthTime);
@@ -84,19 +114,71 @@ const HistoryCard = ({ item, type, onOpenKundli }) => {
         <Row label="Rate" value={`₹ ${rate}/min`} />
         <Row label="POB" value={pob} />
 
+        <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          {type === 'chat' && onViewChat && (
+            <button
+              onClick={() => onViewChat(item)}
+              style={{
+                flex: 1, padding: '11px 16px', border: '1px solid #7c3aed', borderRadius: 8,
+                background: '#fff', color: '#7c3aed', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
+              }}
+            >
+              View Chat
+            </button>
+          )}
+          <button
+            onClick={() => onOpenKundli(item)}
+            disabled={!canOpenKundli}
+            title={canOpenKundli ? 'Open this customer’s kundli' : 'No birth details available for this session'}
+            style={{
+              flex: 1, padding: '11px 16px', border: 'none', borderRadius: 8,
+              background: canOpenKundli ? '#16a34a' : '#d1d5db', color: '#fff', fontWeight: 700, fontSize: '0.95rem',
+              cursor: canOpenKundli ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Open Kundli
+          </button>
+        </div>
+
         <button
-          onClick={() => onOpenKundli(item)}
-          disabled={!canOpenKundli}
-          title={canOpenKundli ? 'Open this customer’s kundli' : 'No birth details available for this session'}
+          onClick={() => setRemedyOpen(true)}
           style={{
-            marginTop: 14, width: '100%', padding: '11px 16px', border: 'none', borderRadius: 8,
-            background: canOpenKundli ? '#16a34a' : '#d1d5db', color: '#fff', fontWeight: 700, fontSize: '0.95rem',
-            cursor: canOpenKundli ? 'pointer' : 'not-allowed',
+            marginTop: 10, width: '100%', padding: '11px 16px', borderRadius: 8,
+            border: '1px solid #f59e0b', background: '#fffbeb', color: '#b45309', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
           }}
         >
-          Open Kundli
+          Suggest Remedy
         </button>
       </div>
+
+      {remedyOpen && (
+        <div onClick={() => setRemedyOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 440, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ margin: 0, color: '#1a0533' }}>Suggest Remedy</h3>
+              <button onClick={() => setRemedyOpen(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#6b7280' }}>&times;</button>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: '0.82rem', color: '#6b7280' }}>For {name}</p>
+
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>Category</label>
+            <select value={remedyCat} onChange={e => setRemedyCat(e.target.value)}
+              style={{ width: '100%', padding: 10, margin: '6px 0 14px', border: '1px solid #e0d4f5', borderRadius: 8 }}>
+              {REMEDY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151' }}>Remedy Details</label>
+            <textarea value={remedyText} onChange={e => setRemedyText(e.target.value)} rows={4}
+              placeholder="e.g. Wear a 5-carat yellow sapphire on Thursday; chant Guru mantra 108 times daily."
+              style={{ width: '100%', padding: 10, margin: '6px 0 14px', border: '1px solid #e0d4f5', borderRadius: 8, resize: 'vertical', fontFamily: 'inherit' }} />
+
+            <button onClick={submitRemedy} disabled={remedySaving}
+              style={{ width: '100%', padding: '12px', border: 'none', borderRadius: 8, background: '#7c3aed', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: remedySaving ? 'not-allowed' : 'pointer', opacity: remedySaving ? 0.6 : 1 }}>
+              {remedySaving ? 'Sending...' : 'Send Remedy'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

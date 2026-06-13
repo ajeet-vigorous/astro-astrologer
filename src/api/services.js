@@ -150,6 +150,18 @@ export const form16aApi = {
   my: (data) => API.post('/astro/astrologer/form16a/my', data),
 };
 
+export const remedyApi = {
+  send: (data) => API.post('/astro/remedy/send', data),
+  forChat: (data) => API.post('/astro/remedy/forChat', data),
+};
+
+export const galleryApi = {
+  add: (data) => API.post('/astro/gallery/add', data),
+  my: (data) => API.post('/astro/gallery/my', data),
+  toggle: (data) => API.post('/astro/gallery/toggle', data),
+  delete: (data) => API.post('/astro/gallery/delete', data),
+};
+
 export const pageApi = {
   getPage: (slug) => API.post('/pages/by-slug', { slug }),
   submitContact: (data) => API.post('/pages/contact', data),
