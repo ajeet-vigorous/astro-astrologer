@@ -12,6 +12,7 @@ export const authApi = {
 export const profileApi = {
   get: (data) => API.post('/astro/getAstrologerById', data),
   update: (data) => API.post('/astro/astrologer/update', data),
+  changeContactNo: (data) => API.post('/astro/astrologer/changeContactNo', data),
   getSkills: () => API.post('/astro/getSkill'),
   getCategories: () => API.post('/astro/getAstrologerCategory'),
   getAvailability: (data) => API.post('/astro/getAstrologerAvailability', data),
@@ -136,6 +137,15 @@ export const storyApi = {
 };
 
 // Pages
+export const trainingVideoApi = {
+  get: () => API.post('/customer/getTrainingVideo', { type: 'astrologer' }),
+};
+
+export const bankUpdateApi = {
+  myStatus: (data) => API.post('/astro/astrologer/bankUpdate/myStatus', data),
+  request: (data) => API.post('/astro/astrologer/bankUpdate/request', data),
+};
+
 export const pageApi = {
   getPage: (slug) => API.post('/pages/by-slug', { slug }),
   submitContact: (data) => API.post('/pages/contact', data),

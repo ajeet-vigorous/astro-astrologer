@@ -92,6 +92,10 @@ const Header = () => {
             <Link to="/appointments" onClick={closeMenu}>Appointments</Link>
             <Link to="/reviews" onClick={closeMenu}>Reviews</Link>
             <div className="dropdown-divider"></div>
+            <Link to="/bank-details" onClick={closeMenu}>Bank Details</Link>
+            <Link to="/training-videos" onClick={closeMenu}>Training Videos</Link>
+            <Link to="/terms-condition" onClick={closeMenu}>Terms &amp; Conditions</Link>
+            <div className="dropdown-divider"></div>
             <button className="dropdown-logout" onClick={() => { handleLogout(); closeMenu(); }}>Sign Out</button>
           </div>
         </div>

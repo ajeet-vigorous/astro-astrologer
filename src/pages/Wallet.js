@@ -17,6 +17,10 @@ const Wallet = () => {
     amount: '', paymentMethod: 'bank', accountNumber: '', ifscCode: '', accountHolderName: '', upiId: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [tdsPercent, setTdsPercent] = useState(0);
+  const [pgChargePercent, setPgChargePercent] = useState(2.5);
+  const [savedBank, setSavedBank] = useState(null);
+  const [savedUpi, setSavedUpi] = useState(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -44,9 +48,28 @@ const Wallet = () => {
         setTotalEarning(parseFloat(record.totalEarning) || 0);
         setTotalPending(parseFloat(record.totalPending) || 0);
         setTotalWithdrawn(parseFloat(record.withdrawAmount) || 0);
+        // Saved bank/UPI (from admin) + deduction charges for the breakdown
+        if (record.bankDetails) setSavedBank(record.bankDetails);
+        if (record.upi) setSavedUpi(record.upi);
+        if (record.tdsPercent !== undefined) setTdsPercent(parseFloat(record.tdsPercent) || 0);
+        if (record.pgChargePercent !== undefined) setPgChargePercent(parseFloat(record.pgChargePercent) || 0);
       }
     } catch (err) { console.error(err); }
     setLoading(false);
+  };
+
+  // Open the withdraw modal pre-filled with the astrologer's saved bank/UPI (auto method)
+  const openWithdraw = () => {
+    const hasBank = savedBank && (savedBank.accountNumber || savedBank.ifscCode);
+    setWithdrawForm({
+      amount: '',
+      paymentMethod: hasBank ? 'bank' : (savedUpi ? 'upi' : 'bank'),
+      accountNumber: savedBank?.accountNumber || '',
+      ifscCode: savedBank?.ifscCode || '',
+      accountHolderName: savedBank?.accountHolderName || '',
+      upiId: savedUpi || '',
+    });
+    setShowWithdraw(true);
   };
 
   const handleWithdraw = async (e) => {
@@ -91,7 +114,7 @@ const Wallet = () => {
           <span className="balance-label">Available Balance</span>
           <span className="balance-amount">&#8377;{balance.toFixed(2)}</span>
         </div>
-        <button className="withdraw-btn" onClick={() => setShowWithdraw(true)}>Withdraw</button>
+        <button className="withdraw-btn" onClick={openWithdraw}>Withdraw</button>
       </div>
 
       <div className="wallet-stats-row">
@@ -148,6 +171,32 @@ const Wallet = () => {
                   <input value={withdrawForm.upiId} onChange={(e) => setWithdrawForm({ ...withdrawForm, upiId: e.target.value })} placeholder="name@upi" />
                 </div>
               )}
+
+              {/* Deduction breakdown — shown live as the astrologer types the amount */}
+              {(() => {
+                const wAmt = parseFloat(withdrawForm.amount) || 0;
+                if (wAmt <= 0) return null;
+                const tds = wAmt * tdsPercent / 100;
+                const pg = wAmt * pgChargePercent / 100;
+                const payable = wAmt - tds - pg;
+                const row = { display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', margin: '6px 0' };
+                return (
+                  <div style={{ background: '#faf7ff', border: '1px solid #e0d4f5', borderRadius: 10, padding: 14, margin: '14px 0' }}>
+                    <div style={{ fontWeight: 700, color: '#1a0533', marginBottom: 8 }}>Withdrawal Breakdown</div>
+                    <div style={row}><span>Withdraw Amount</span><span>&#8377;{wAmt.toFixed(2)}</span></div>
+                    <div style={{ ...row, color: '#dc2626' }}><span>TDS ({tdsPercent}%)</span><span>- &#8377;{tds.toFixed(2)}</span></div>
+                    <div style={{ ...row, color: '#dc2626' }}><span>PG Charge ({pgChargePercent}%)</span><span>- &#8377;{pg.toFixed(2)}</span></div>
+                    <hr style={{ border: 'none', borderTop: '1px dashed #c4b5fd', margin: '10px 0' }} />
+                    <div style={{ ...row, fontWeight: 700, fontSize: '1rem', color: '#16a34a' }}>
+                      <span>You'll Receive</span><span>&#8377;{payable.toFixed(2)}</span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '8px 0 0' }}>
+                      &#8377;{wAmt.toFixed(2)} will be deducted from your wallet; charges above are subtracted from your payout.
+                    </p>
+                  </div>
+                );
+              })()}
+
               <button type="submit" className="submit-btn" disabled={submitting}>
                 {submitting ? 'Submitting...' : 'Submit Request'}
               </button>
@@ -160,11 +209,12 @@ const Wallet = () => {
         <div className="section">
           <h3>Withdrawal Requests</h3>
           <table className="data-table">
-            <thead><tr><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
+            <thead><tr><th>Amount</th><th>You Get</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
             <tbody>
               {withdrawals.map((w, i) => (
                 <tr key={i}>
                   <td>&#8377;{parseFloat(w.withdrawAmount || w.amount || 0).toFixed(2)}</td>
+                  <td className="text-green">&#8377;{parseFloat(w.pay_amount != null ? w.pay_amount : (w.withdrawAmount || w.amount || 0)).toFixed(2)}</td>
                   <td>{w.paymentMethod || '-'}</td>
                   <td><span className={`badge ${(w.status || '').toLowerCase()}`}>{w.status || 'Pending'}</span></td>
                   <td>{w.created_at ? new Date(w.created_at).toLocaleDateString('en-IN') : '-'}</td>
