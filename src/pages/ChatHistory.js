@@ -1,71 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
+import HistoryCard from '../components/HistoryCard';
 
 const ChatHistory = () => {
-  const { astrologer, logout } = useAuth();
+  const { astrologer } = useAuth();
+  const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!astrologer?.id) return;
-    fetchHistory();
+    (async () => {
+      try {
+        const res = await chatApi.getChatHistory({ astrologerId: astrologer.id, startIndex: 0, fetchRecord: 50 });
+        setHistory(res.data?.recordList || []);
+      } catch (err) { console.error(err); }
+      setLoading(false);
+    })();
   }, [astrologer]);
 
-  const fetchHistory = async () => {
-    try {
-      const res = await chatApi.getChatHistory({ astrologerId: astrologer.id, startIndex: 0, fetchRecord: 50 });
-      const d = res.data;
-      setHistory(d?.recordList || []);
-    } catch (err) {
-      console.error(err);
-    }
-    setLoading(false);
+  const openKundli = (item) => {
+    navigate('/kundali', { state: { prefill: {
+      name: item.intakeName || item.userName || '',
+      gender: item.intakeGender || 'Male',
+      birthDate: item.intakeBirthDate || '',
+      birthTime: item.intakeBirthTime || '',
+      birthPlace: item.intakeBirthPlace || '',
+      latitude: item.intakeLat || '',
+      longitude: item.intakeLong || '',
+    } } });
   };
 
+  if (loading) return <div className="page-loading"><div className="spinner"></div></div>;
+
   return (
-    <div className="dashboard">
-      <header className="app-header">
-        <h2>AstroGuru - Chat History</h2>
-        <div className="header-right">
-          <Link to="/" className="nav-link">Dashboard</Link>
-          <button className="logout-btn" onClick={logout}>Logout</button>
-        </div>
-      </header>
-
-      <div className="dashboard-content">
-        <h3>Completed Chats</h3>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner"></div></div>
-        ) : history.length === 0 ? (
-          <div className="no-requests"><p>No chat history found</p></div>
-        ) : (
-          <table className="history-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Duration</th>
-                <th>Earnings</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((chat) => (
-                <tr key={chat.id}>
-                  <td>{chat.userName || chat.name || 'User'}</td>
-                  <td>{chat.totalMin || 0} min</td>
-                  <td style={{ color: '#10b981', fontWeight: 600 }}>
-                    &#8377;{parseFloat(chat.deduction || 0).toFixed(2)}
-                  </td>
-                  <td>{chat.created_at ? new Date(chat.created_at).toLocaleDateString('en-IN') : '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+    <div className="page-container">
+      <div className="page-header">
+        <h2>Chat History</h2>
+        <p>Your completed chat sessions</p>
       </div>
+
+      {history.length === 0 ? (
+        <div className="empty-state">No chat history found</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+          {history.map((item) => (
+            <HistoryCard key={item.id} item={item} type="chat" onOpenKundli={openKundli} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

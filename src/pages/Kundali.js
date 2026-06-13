@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { kundaliApi } from '../api/services';
 import { toast } from 'react-toastify';
 
 const Kundali = () => {
+  const location = useLocation();
   const [form, setForm] = useState({ name: '', gender: 'Male', birthDate: '', birthTime: '', birthPlace: '', latitude: '', longitude: '' });
   const [kundaliRecord, setKundaliRecord] = useState(null);
   const [basicReport, setBasicReport] = useState(null);
@@ -11,6 +13,30 @@ const Kundali = () => {
   const debounceRef = useRef(null);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // When opened from Chat/Call History "Open Kundli", prefill the customer's birth
+  // details and auto-generate (geocoding the place first if lat/long are missing).
+  useEffect(() => {
+    const p = location.state?.prefill;
+    if (!p || !p.birthDate || !p.birthPlace) return;
+    (async () => {
+      let lat = p.latitude, lon = p.longitude;
+      if (!lat || !lon) {
+        try {
+          const res = await kundaliApi.geocode({ place: p.birthPlace });
+          if (res.data?.latitude && res.data?.longitude) { lat = String(res.data.latitude); lon = String(res.data.longitude); }
+        } catch (e) { /* ignore */ }
+      }
+      const filled = {
+        name: p.name || '', gender: p.gender || 'Male',
+        birthDate: p.birthDate || '', birthTime: (p.birthTime || '').slice(0, 5),
+        birthPlace: p.birthPlace || '', latitude: lat || '', longitude: lon || '',
+      };
+      setForm(filled);
+      if (filled.latitude && filled.longitude) generateKundali(filled);
+      else toast.error('Could not locate the birth place. Adjust it and generate manually.');
+    })();
+  }, []);
 
   const handlePlaceChange = (e) => {
     const place = e.target.value;
@@ -30,27 +56,20 @@ const Kundali = () => {
     }, 800);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name || !form.birthDate || !form.birthTime || !form.birthPlace) {
-      toast.error('Please fill all required fields'); return;
-    }
-    if (!form.latitude || !form.longitude) {
-      toast.error('Location not found. Try a more specific place name.'); return;
-    }
+  const generateKundali = async (data) => {
     setLoading(true);
     setBasicReport(null);
     setKundaliRecord(null);
     try {
       const res = await kundaliApi.add({
-        kundali: [{ name: form.name, gender: form.gender, birthDate: form.birthDate, birthTime: form.birthTime, birthPlace: form.birthPlace, latitude: form.latitude, longitude: form.longitude, pdf_type: 'basic' }]
+        kundali: [{ name: data.name, gender: data.gender, birthDate: data.birthDate, birthTime: data.birthTime, birthPlace: data.birthPlace, latitude: data.latitude, longitude: data.longitude, pdf_type: 'basic' }]
       });
       const d = res.data?.data || res.data;
       const record = d?.recordList?.[0] || d?.recordList || null;
       setKundaliRecord(record);
 
       if (record?.id) {
-        const basicRes = await kundaliApi.getBasicReport({ kundaliId: record.id, dob: form.birthDate, tob: form.birthTime, lat: form.latitude, lon: form.longitude, tz: 5.5, lang: 'en' });
+        const basicRes = await kundaliApi.getBasicReport({ kundaliId: record.id, dob: data.birthDate, tob: data.birthTime, lat: data.latitude, lon: data.longitude, tz: 5.5, lang: 'en' });
         const bd = basicRes.data?.data || basicRes.data;
         setBasicReport(bd?.planetDetails || bd);
       }
@@ -59,6 +78,17 @@ const Kundali = () => {
       toast.error(err.response?.data?.message || 'Failed to generate kundali');
     }
     setLoading(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name || !form.birthDate || !form.birthTime || !form.birthPlace) {
+      toast.error('Please fill all required fields'); return;
+    }
+    if (!form.latitude || !form.longitude) {
+      toast.error('Location not found. Try a more specific place name.'); return;
+    }
+    generateKundali(form);
   };
 
   const renderPlanetDetails = () => {
