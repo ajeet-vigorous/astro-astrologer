@@ -15,6 +15,7 @@ const Register = () => {
   const [form, setForm] = useState({
     name: '', email: '', contactNo: '', countryCode: '+91', whatsappNo: '',
     gender: '', birthDate: '', currentCity: '', country: 'India',
+    billingAddress: '',
     termsAccepted: false,
   });
 
@@ -151,6 +152,12 @@ const Register = () => {
               <div className="reg-field">
                 <label>Country</label>
                 <input name="country" value={form.country} onChange={handleChange} placeholder="Country" />
+              </div>
+            </div>
+            <div className="reg-row">
+              <div className="reg-field full">
+                <label>Billing Address</label>
+                <textarea name="billingAddress" value={form.billingAddress} onChange={handleChange} rows={3} placeholder="Full billing address (for payouts & invoices)" />
               </div>
             </div>
 

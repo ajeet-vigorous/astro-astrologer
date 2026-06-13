@@ -13,6 +13,7 @@ export const profileApi = {
   get: (data) => API.post('/astro/getAstrologerById', data),
   update: (data) => API.post('/astro/astrologer/update', data),
   changeContactNo: (data) => API.post('/astro/astrologer/changeContactNo', data),
+  updateBillingAddress: (data) => API.post('/astro/astrologer/updateBillingAddress', data),
   getSkills: () => API.post('/astro/getSkill'),
   getCategories: () => API.post('/astro/getAstrologerCategory'),
   getAvailability: (data) => API.post('/astro/getAstrologerAvailability', data),
