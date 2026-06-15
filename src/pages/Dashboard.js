@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { chatApi, callApi, boostApi, waitlistApi } from '../api/services';
+import { chatApi, callApi, boostApi, waitlistApi, trainingVideoApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 
 const SOCKET_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
+// Extract the 11-char YouTube id from any YouTube URL form.
+const ytId = (url) => {
+  const m = (url || '').match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
+  return m ? m[1] : '';
+};
 
 const Dashboard = () => {
   const { astrologer, logout } = useAuth();
@@ -19,6 +25,7 @@ const Dashboard = () => {
   const [boosting, setBoosting] = useState(false);
   const [waitlist, setWaitlist] = useState([]);   // customers waiting in this astrologer's queue
   const [showQueue, setShowQueue] = useState(false);  // toggle full queue panel
+  const [trainingVideos, setTrainingVideos] = useState([]);
   const socketRef = useRef(null);
   const pollRef = useRef(null);
 
@@ -27,6 +34,7 @@ const Dashboard = () => {
     fetchWaitlist();
     connectSocket();
     boostApi.getInfo({ astrologer_id: astrologer?.id }).then(res => setBoostInfo(res.data)).catch(() => {});
+    trainingVideoApi.get().then(res => setTrainingVideos(res.data?.recordList || res.data?.data || [])).catch(() => {});
 
     // Poll for new requests + waitlist every 5 seconds (socket is primary, this is fallback)
     pollRef.current = setInterval(() => {
@@ -420,6 +428,37 @@ const Dashboard = () => {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Training Videos */}
+        {trainingVideos.length > 0 && (
+          <>
+            <h3 style={{ marginTop: 32 }}>Training Videos</h3>
+            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+              {trainingVideos.map((v) => {
+                const id = ytId(v.video_link);
+                if (!id) return null;
+                return (
+                  <div key={v.id} style={{ flex: '0 0 300px', maxWidth: 300, borderRadius: 12, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+                    <div style={{ position: 'relative', paddingTop: '56.25%' }}>
+                      <iframe
+                        src={`https://www.youtube.com/embed/${id}`}
+                        title={v.title || 'Training video'}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                      />
+                    </div>
+                    {v.title && (
+                      <div style={{ padding: 12, fontSize: '0.88rem', fontWeight: 600, color: '#1a0533', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {v.title}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>
