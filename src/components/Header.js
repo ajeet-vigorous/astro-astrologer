@@ -81,6 +81,7 @@ const Header = () => {
           <div className="dropdown-menu dropdown-right">
             <Link to="/profile" onClick={closeMenu}>My Account</Link>
             <Link to="/gallery" onClick={closeMenu}>My Gallery</Link>
+            <Link to="/my-assistants" onClick={closeMenu}>My Assistants</Link>
             <Link to="/wallet" onClick={closeMenu}>My Wallet</Link>
             <div className="dropdown-divider"></div>
             <Link to="/chat-history" onClick={closeMenu}>My Chats</Link>

@@ -34,6 +34,7 @@ import BankDetails from './pages/BankDetails';
 import Form16A from './pages/Form16A';
 import Gallery from './pages/Gallery';
 import BillingAddress from './pages/BillingAddress';
+import MyAssistants from './pages/MyAssistants';
 import Layout from './components/Layout';
 import './App.css';
 
@@ -73,6 +74,7 @@ function AppRoutes() {
       <Route path="/form-16a" element={<ProtectedRoute><Form16A /></ProtectedRoute>} />
       <Route path="/gallery" element={<ProtectedRoute><Gallery /></ProtectedRoute>} />
       <Route path="/billing-address" element={<ProtectedRoute><BillingAddress /></ProtectedRoute>} />
+      <Route path="/my-assistants" element={<ProtectedRoute><MyAssistants /></ProtectedRoute>} />
       <Route path="/about" element={<ProtectedRoute><StaticPage /></ProtectedRoute>} />
       <Route path="/contact" element={<ProtectedRoute><Contact /></ProtectedRoute>} />
       <Route path="/privacy-policy" element={<ProtectedRoute><StaticPage /></ProtectedRoute>} />

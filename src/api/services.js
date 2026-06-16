@@ -163,6 +163,13 @@ export const galleryApi = {
   delete: (data) => API.post('/astro/gallery/delete', data),
 };
 
+export const assistantApi = {
+  list: (data) => API.post('/astro/getAstrologerAssistant', data),
+  add: (data) => API.post('/astro/astrologerAssistant/add', data),
+  update: (data) => API.post('/astro/astrologerAssistant/update', data),
+  delete: (data) => API.post('/astro/astrologerAssistant/delete', data),
+};
+
 export const pageApi = {
   getPage: (slug) => API.post('/pages/by-slug', { slug }),
   submitContact: (data) => API.post('/pages/contact', data),
